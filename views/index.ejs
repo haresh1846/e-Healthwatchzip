@@ -1,0 +1,125 @@
+<%- include('partials/header') %>
+
+<script>
+function redir() {
+  document.frm_pickup.method = "post";
+  document.frm_pickup.action = "/";
+  document.frm_pickup.submit();
+}
+</script>
+
+<!------ Carousel ------->
+<div class="container-fluid">
+  <div class="row">
+    <div id="myCarousel" class="carousel slide" data-ride="carousel">
+      <div class="carousel-inner" role="listbox">
+        <div class="item active">
+          <div class="banner-placeholder" style="background:#2c7bb6;color:#fff;text-align:center;padding:80px 20px;">
+            <h2>e-healthwatch</h2>
+            <p>AMH · PCOS · Menopause</p>
+          </div>
+        </div>
+        <div class="item">
+          <div class="banner-placeholder" style="background:#1a5a8a;color:#fff;text-align:center;padding:80px 20px;">
+            <h2>BMD Calculator</h2>
+            <p>Bone Mineral Density Assessment</p>
+          </div>
+        </div>
+        <div class="item">
+          <div class="banner-placeholder" style="background:#3a8fc1;color:#fff;text-align:center;padding:80px 20px;">
+            <h2>Menopause Forecasting</h2>
+            <p>Predict menopause onset using AMH values</p>
+          </div>
+        </div>
+        <div class="item">
+          <div class="banner-placeholder" style="background:#0e4a7a;color:#fff;text-align:center;padding:80px 20px;">
+            <h2>Women's Health</h2>
+            <p>Gynaecology · Pregnancy · Forecasting</p>
+          </div>
+        </div>
+      </div>
+      <a class="left carousel-control" href="#myCarousel" role="button" data-slide="prev">
+        <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
+        <span class="sr-only">Previous</span>
+      </a>
+      <a class="right carousel-control" href="#myCarousel" role="button" data-slide="next">
+        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
+        <span class="sr-only">Next</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!------ Below Carousel ------->
+<div class="below-carousel">
+  <div class="container">
+    <div class="row">
+      <div class="text-center"></div>
+    </div>
+  </div>
+</div>
+
+<!------ Services ------->
+<section id="cat-bg">
+  <div class="container">
+    <div class="row">
+      <div class="col-md-8 col-xs-12">
+        <div class="col-md-5 col-sm-6 col-xs-6 category border-bottom">
+          <h2> About your health </h2>
+          <p>Health may be defined as a "complete/balanced condition" in which there is synchronization between body and mind. Cells are the fundamental units of the body. Cells with similar functions are grouped to form tissues like epithelial, connective, muscular and nervous tissues. <br/>
+          <br><a href="/health.asp">Read more... </a></p>
+        </div>
+        <div class="col-md-5 col-sm-6 col-xs-6 category border-bottom border-left">
+          <h2> Menopause </h2>
+          <p>Why to predict menopause?<br><br>
+          The cessation of reproductive life span in the women is called menopause and prediction of menopause will help to plan for reproductive potentiality in infertility treatment and planning for premenopausal and post-menopausal related health effects.
+          <a href="/menopause.asp">Read more... </a></p>
+        </div>
+        <div class="col-md-5 col-sm-6 col-xs-6 category ">
+          <h2> About modelling of data </h2>
+          <p>In the present day, multiple diagnoses tests involves exorbitant cost and are not affordable for everyone. <br/>
+          <a href="/data.asp">Read more... </a></p>
+        </div>
+        <div class="col-md-5 col-sm-6 col-xs-6 category  border-left">
+          <h2> About disease  </h2>
+          <p>The manifestation of a disease initially may be detected at body level or at organ level.<br/>
+          <a href="/organ.asp">Read more... </a></p>
+        </div>
+      </div>
+      <div class="col-md-4 form-heading">
+        <h1>Send us a Message</h1>
+        <form role="form" name="frm_pickup" method="post" action="/">
+          <input type="hidden" name="validate1" value="T">
+          <div class="form-group">
+            <input type="text" class="form-control" name="name" placeholder="Your Name">
+          </div>
+          <div class="form-group">
+            <input type="email" class="form-control" name="email" placeholder=" Your Email address">
+          </div>
+          <div class="form-group">
+            <input type="text" class="form-control" name="phone" placeholder="phone number">
+          </div>
+          <div class="form-group">
+            <textarea class="form-control" rows="5" name="comment" placeholder="Message"></textarea>
+          </div>
+          <button type="submit" class="btn btn-default pull-left form-submit">Submit</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!------ FOOTER ------->
+<footer>
+  <div class="container">
+    <div class="row">
+      &copy; All rights reserved<br>
+    </div>
+    Visitor counter not available.
+  </div>
+</footer>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<%- include('partials/header') %>
+
+<!------ About Banner ------->
+<section id="banner-section">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="banner-placeholder text-center">
+        <h2>Menopause Forecast Result</h2>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!------ Result ------->
+<section id="about-cont">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+        <h2 class="aboutpage-title">Menopause Forecast Result</h2>
+        <div class="aboutpage-content">
+          <div align="Center">
+            <table id="datatable" width="50%">
+              <tr><td>Name</td><td><%= name %></td></tr>
+              <tr><td>Age</td><td><%= age %></td></tr>
+              <tr><td>Periods</td><td><%= periods %></td></tr>
+              <tr><td>AMH</td><td><%= amhvalue %></td></tr>
+              <tr>
+                <td><font color="RoyalBlue"><b>Forecasted Menopause Age</b></font></td>
+                <td><font color="RoyalBlue"><b><%= fmvalue %></b></font></td>
+              </tr>
+            </table>
+            <br><br><br>
+            <a href="/forecasting.asp"><button type="button" class="btn btn-primary">Back</button></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

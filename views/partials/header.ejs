@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <META NAME="ROBOTS" CONTENT="INDEX, FOLLOW">
+  <meta name="description" content="AMH,PCOS,Menopause">
+  <title>e-healthwatch</title>
+  <!-- Bootstrap 3 from CDN -->
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="/css/custom.css">
+</head>
+<body>
+<header>
+  <div class="container-fluid">
+    <div class="row">
+      <div class="black-top">
+        <div class="container">
+          <div class="pull-right">
+            <div class="help-line"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nav Bar -->
+  <div class="container-fluid">
+    <div class="row">
+      <nav class="navbar navbar-default navbar-static-top">
+        <div class="container">
+          <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+              <span class="sr-only">Toggle navigation</span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+              <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="/"><img alt="e-healthwatch" class="img-responsive" src="/images/logo.png" id="top" style="display:inline-block; max-height:50px;"/></a>
+          </div>
+          <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav pull-right">
+              <li><a href="/">Home</a></li>
+              <li><a href="/gynaecology.asp">Gynaecology</a></li>
+              <li><a href="/pregnancy.asp">Pregnancy</a></li>
+              <li><a href="/forecasting.asp">Forecast Menopause</a></li>
+              <% if (locals.userid && locals.userid !== '') { %>
+                <li><a href="/logout.asp">Logout</a></li>
+              <% } else { %>
+                <li><a href="/bmdlogin.asp">BMD Calculator</a></li>
+              <% } %>
+              <li><a href="/contact.asp">Contact Us</a></li>
+            </ul>
+          </div>
+        </div>
+      </nav>
+    </div>
+  </div>
+</header>

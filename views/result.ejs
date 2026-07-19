@@ -1,0 +1,37 @@
+<%- include('partials/header') %>
+
+<script>
+function back() {
+  window.location.href = '/bmd.asp';
+}
+</script>
+
+<!------ About Banner ------->
+<section id="banner-section">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="banner-placeholder text-center">
+        <h2>BMD Result</h2>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!------ Result ------->
+<section id="about-cont">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+        <h2 class="aboutpage-title">BMD result</h2>
+        <div class="aboutpage-content">
+          <div class="form-group inner-tittle">
+            <label class="inner-tittle">Your Result &nbsp; <strong><%= result %></strong></label>
+          </div>
+          <button type="button" name="btn_enq" id="btn_enq" class="btn btn-warning submit-form" onclick="back()">Back</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>
