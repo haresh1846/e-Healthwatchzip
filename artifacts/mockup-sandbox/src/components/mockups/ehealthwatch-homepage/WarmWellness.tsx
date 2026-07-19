@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Heart, Activity, LineChart, BookOpen, ChevronRight, Menu, X, Mail, MapPin, Phone, ArrowRight, User } from 'lucide-react';
+import { Heart, Activity, LineChart, BookOpen, ChevronRight, Menu, X, Mail, MapPin, Phone, ArrowRight, User, Sparkles, Users, ShieldCheck, Zap, Star, CheckCircle2, Clock } from 'lucide-react';
 import './_group.css';
 
 export default function WarmWellness() {
@@ -123,7 +123,7 @@ export default function WarmWellness() {
                     </div>
                   ))}
                 </div>
-                <p>Join thousands of women<br/>taking control of their health</p>
+                <p>Join 12,000+ women<br/>taking control of their health — free</p>
               </div>
             </div>
 
@@ -138,12 +138,12 @@ export default function WarmWellness() {
                 
                 {/* Floating detail card */}
                 <div className="absolute -bottom-6 -left-6 bg-white/90 backdrop-blur-md p-5 rounded-3xl shadow-xl shadow-stone-200/50 border border-white flex items-center gap-4 animate-bounce" style={{ animationDuration: '3s' }}>
-                  <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center">
-                    <Activity className="w-6 h-6 text-rose-500" />
+                  <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-amber-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-[#78716C] font-medium">Data Accuracy</p>
-                    <p className="text-xl font-lora font-bold text-[#44403C]">99.8%</p>
+                    <p className="text-sm text-[#78716C] font-medium">Always Free</p>
+                    <p className="text-xl font-lora font-bold text-[#44403C]">No sign-up needed</p>
                   </div>
                 </div>
               </div>
@@ -156,6 +156,38 @@ export default function WarmWellness() {
           <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
               <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.08,130.83,111.47,196.59,101.4,239.5,94.9,282.7,80.8,321.39,56.44Z" className="shape-fill"></path>
           </svg>
+        </div>
+      </section>
+
+      {/* Social Proof Strip */}
+      <section className="bg-white border-y border-rose-100/60 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-16 text-[#78716C]">
+            <div className="flex items-center gap-3">
+              <div className="flex -space-x-2">
+                {['bg-rose-200','bg-amber-200','bg-green-200','bg-purple-200'].map((c,i) => (
+                  <div key={i} className={`w-8 h-8 rounded-full ${c} border-2 border-white flex items-center justify-center`}>
+                    <User className="w-4 h-4 text-stone-600" />
+                  </div>
+                ))}
+              </div>
+              <span className="font-medium text-[#44403C]">12,000+ women <span className="text-rose-500 font-semibold">already using it</span></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex text-amber-400">
+                {[...Array(5)].map((_,i) => <Star key={i} className="w-4 h-4" fill="currentColor" />)}
+              </div>
+              <span className="font-medium text-[#44403C]">4.9 / 5 <span className="text-stone-400 font-normal">from users</span></span>
+            </div>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-green-500" />
+              <span className="font-medium text-[#44403C]">100% Private & Secure</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              <span className="font-medium text-[#44403C]">Completely Free — No Account Needed</span>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -216,6 +248,47 @@ export default function WarmWellness() {
                 Learn more <ChevronRight className="w-4 h-4 ml-1" />
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="py-24 bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(251,207,232,0.2),transparent_60%)]"></div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="text-center max-w-2xl mx-auto mb-16">
+            <span className="inline-flex items-center gap-2 text-rose-500 font-semibold text-sm uppercase tracking-widest mb-4">
+              <Zap className="w-4 h-4" /> Simple to use
+            </span>
+            <h2 className="font-lora text-3xl sm:text-4xl text-[#44403C] mb-4">Your health journey in 3 steps</h2>
+            <p className="text-[#78716C] text-lg">No jargon, no sign-up walls. Just clear, personalised health insights at your fingertips.</p>
+          </div>
+          <div className="grid md:grid-cols-3 gap-8 relative">
+            {/* connector line */}
+            <div className="hidden md:block absolute top-10 left-1/3 right-1/3 h-0.5 bg-gradient-to-r from-rose-200 via-amber-200 to-green-200"></div>
+            {[
+              { step: '01', icon: <BookOpen className="w-7 h-7 text-rose-600" />, bg: 'bg-rose-100', title: 'Explore Your Topics', desc: 'Browse gynaecology, menopause, pregnancy, and bone health guides — all written in plain language, evidence-based.' },
+              { step: '02', icon: <Activity className="w-7 h-7 text-amber-600" />, bg: 'bg-amber-100', title: 'Run a Prediction', desc: 'Enter your AMH level or BMD data into our calculators and get an instant, personalised forecast in seconds.' },
+              { step: '03', icon: <CheckCircle2 className="w-7 h-7 text-green-600" />, bg: 'bg-green-100', title: 'Understand Your Results', desc: 'Receive clear insights and guidance on your results with recommended next steps tailored to you.' },
+            ].map(({ step, icon, bg, title, desc }) => (
+              <div key={step} className="relative flex flex-col items-center text-center p-8">
+                <div className={`w-20 h-20 ${bg} rounded-3xl flex items-center justify-center mb-6 shadow-sm`}>
+                  {icon}
+                </div>
+                <span className="text-4xl font-lora font-bold text-stone-100 absolute top-6 right-8 select-none">{step}</span>
+                <h3 className="font-lora text-xl font-semibold text-[#44403C] mb-3">{title}</h3>
+                <p className="text-[#78716C] leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+          {/* Quick-start CTA */}
+          <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <button className="bg-gradient-to-r from-[#E11D48] to-rose-500 text-white px-10 py-4 rounded-full font-semibold hover:shadow-lg hover:shadow-rose-500/30 transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2">
+              <Zap className="w-5 h-5" /> Try Menopause Forecast — Free
+            </button>
+            <button className="border border-rose-200 text-[#E11D48] px-10 py-4 rounded-full font-semibold hover:bg-rose-50 transition-all duration-300 flex items-center gap-2">
+              <Clock className="w-5 h-5" /> Takes less than 2 minutes
+            </button>
           </div>
         </div>
       </section>
