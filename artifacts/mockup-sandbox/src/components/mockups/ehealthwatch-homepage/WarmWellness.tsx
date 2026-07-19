@@ -123,7 +123,7 @@ export default function WarmWellness() {
                     </div>
                   ))}
                 </div>
-                <p>Join 12,000+ women<br/>taking control of their health — free</p>
+                <p>Join 12,000+ women<br/>taking control of their health today</p>
               </div>
             </div>
 
@@ -136,14 +136,17 @@ export default function WarmWellness() {
                   className="w-full h-full object-cover blob-shape shadow-2xl shadow-rose-900/10 border-4 border-white/50"
                 />
                 
-                {/* Floating detail card */}
-                <div className="absolute -bottom-6 -left-6 bg-white/90 backdrop-blur-md p-5 rounded-3xl shadow-xl shadow-stone-200/50 border border-white flex items-center gap-4 animate-bounce" style={{ animationDuration: '3s' }}>
-                  <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center">
-                    <Sparkles className="w-6 h-6 text-amber-500" />
+                {/* Floating deal card */}
+                <div className="absolute -bottom-6 -left-6 bg-white/95 backdrop-blur-md px-5 py-4 rounded-3xl shadow-xl shadow-rose-200/60 border border-rose-100 flex items-center gap-4 animate-bounce" style={{ animationDuration: '3s' }}>
+                  <div className="w-12 h-12 rounded-full bg-rose-500 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm text-[#78716C] font-medium">Always Free</p>
-                    <p className="text-xl font-lora font-bold text-[#44403C]">No sign-up needed</p>
+                    <p className="text-xs text-rose-500 font-bold uppercase tracking-widest mb-0.5">Limited Offer</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-2xl font-lora font-bold text-[#44403C]">₹49</span>
+                      <span className="text-sm line-through text-stone-400">₹199</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -184,8 +187,8 @@ export default function WarmWellness() {
               <span className="font-medium text-[#44403C]">100% Private & Secure</span>
             </div>
             <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-amber-500" />
-              <span className="font-medium text-[#44403C]">Completely Free — No Account Needed</span>
+              <Sparkles className="w-5 h-5 text-rose-500" />
+              <span className="font-medium text-[#44403C]">Special Offer: <span className="text-rose-500 font-bold">₹49</span> <span className="line-through text-stone-400 font-normal">₹199</span></span>
             </div>
           </div>
         </div>
@@ -284,7 +287,7 @@ export default function WarmWellness() {
           {/* Quick-start CTA */}
           <div className="mt-14 flex flex-col sm:flex-row items-center justify-center gap-4">
             <button className="bg-gradient-to-r from-[#E11D48] to-rose-500 text-white px-10 py-4 rounded-full font-semibold hover:shadow-lg hover:shadow-rose-500/30 transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2">
-              <Zap className="w-5 h-5" /> Try Menopause Forecast — Free
+              <Zap className="w-5 h-5" /> Get Started at ₹49
             </button>
             <button className="border border-rose-200 text-[#E11D48] px-10 py-4 rounded-full font-semibold hover:bg-rose-50 transition-all duration-300 flex items-center gap-2">
               <Clock className="w-5 h-5" /> Takes less than 2 minutes
@@ -348,6 +351,80 @@ export default function WarmWellness() {
               {/* Decorative blobs around image */}
               <div className="absolute -top-6 -right-6 w-24 h-24 bg-rose-100 rounded-full mix-blend-multiply blur-xl -z-10"></div>
               <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-amber-100 rounded-full mix-blend-multiply blur-xl -z-10"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-24 bg-[#FFFBF5]">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <span className="inline-block bg-rose-100 text-rose-600 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-4">Limited Time Offer</span>
+            <h2 className="font-lora text-3xl sm:text-4xl text-[#44403C] mb-4">Simple, honest pricing</h2>
+            <p className="text-[#78716C] text-lg">Full access to predictive health tools — at a price that respects you.</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8 items-center">
+            {/* Offer Card */}
+            <div className="relative bg-gradient-to-br from-rose-500 to-rose-600 rounded-[2.5rem] p-10 text-white shadow-2xl shadow-rose-500/30 overflow-hidden">
+              {/* Background glow */}
+              <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/10 rounded-full blur-2xl"></div>
+              <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-white/10 rounded-full blur-2xl"></div>
+
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur rounded-full px-4 py-1.5 text-sm font-bold mb-6">
+                  <Sparkles className="w-4 h-4" /> Special Offer — Limited Time
+                </div>
+
+                <div className="flex items-end gap-4 mb-2">
+                  <span className="text-7xl font-lora font-bold leading-none">₹49</span>
+                  <div className="pb-2">
+                    <p className="text-white/60 text-sm line-through">₹199</p>
+                    <p className="text-white/80 text-sm">75% off</p>
+                  </div>
+                </div>
+                <p className="text-white/80 mb-8">One-time access · No subscription</p>
+
+                <ul className="space-y-3 mb-10">
+                  {[
+                    'Menopause Forecasting Calculator',
+                    'Bone Mineral Density (BMD) Calculator',
+                    'Full Gynaecology & Pregnancy Guides',
+                    'Personalised health insights',
+                    'Private & secure results',
+                  ].map((f, i) => (
+                    <li key={i} className="flex items-center gap-3 text-white/90">
+                      <CheckCircle2 className="w-5 h-5 text-white flex-shrink-0" />
+                      <span>{f}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <button className="w-full bg-white text-rose-600 font-bold py-4 rounded-2xl hover:bg-rose-50 transition-colors shadow-lg text-lg">
+                  Get Full Access — ₹49
+                </button>
+                <p className="text-center text-white/60 text-sm mt-4">Secure payment · Instant access</p>
+              </div>
+            </div>
+
+            {/* Value props */}
+            <div className="space-y-6 pl-0 md:pl-6">
+              <h3 className="font-lora text-2xl text-[#44403C]">Why ₹49 is worth every rupee</h3>
+              {[
+                { icon: <ShieldCheck className="w-6 h-6 text-green-500" />, bg: 'bg-green-50', title: 'Clinically grounded models', desc: 'Our AMH-based menopause forecasting and BMD algorithms are built on peer-reviewed research.' },
+                { icon: <Zap className="w-6 h-6 text-amber-500" />, bg: 'bg-amber-50', title: 'Results in under 2 minutes', desc: 'Enter your data, get a personalised prediction instantly — no waiting, no appointments.' },
+                { icon: <Users className="w-6 h-6 text-rose-500" />, bg: 'bg-rose-50', title: 'Trusted by 12,000+ women', desc: 'Women across India use e-healthwatch to understand their health journey on their own terms.' },
+                { icon: <Star className="w-6 h-6 text-purple-500" />, bg: 'bg-purple-50', title: '4.9 / 5 user satisfaction', desc: 'Users consistently rate us highly for clarity, accuracy, and ease of use.' },
+              ].map(({ icon, bg, title, desc }) => (
+                <div key={title} className="flex gap-4 items-start">
+                  <div className={`w-12 h-12 ${bg} rounded-2xl flex items-center justify-center flex-shrink-0`}>{icon}</div>
+                  <div>
+                    <p className="font-semibold text-[#44403C] mb-1">{title}</p>
+                    <p className="text-[#78716C] text-sm leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
