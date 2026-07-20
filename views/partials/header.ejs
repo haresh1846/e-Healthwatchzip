@@ -65,14 +65,19 @@
       <a href="/forecasting.asp" class="ehw-nav__link">Forecast Menopause</a>
       <a href="/contact.asp" class="ehw-nav__link">Contact Us</a>
       <% if (locals.userid && locals.userid !== '') { %>
-        <a href="/logout.asp" class="ehw-nav__cta">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Logout
+        <a href="/logout.asp" class="ehw-nav__link">BMD Logout</a>
+      <% } else { %>
+        <a href="/bmdlogin.asp" class="ehw-nav__link" style="font-size:13px;opacity:.75;">Clinic Login</a>
+      <% } %>
+      <% if (locals.consumerId) { %>
+        <a href="/dashboard" class="ehw-nav__cta">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          My Dashboard
         </a>
       <% } else { %>
-        <a href="/bmdlogin.asp" class="ehw-nav__cta">
+        <a href="/login" class="ehw-nav__cta">
           <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          BMD Login
+          Sign In
         </a>
       <% } %>
     </div>
@@ -89,10 +94,16 @@
     <a href="/pregnancy.asp">Pregnancy</a>
     <a href="/forecasting.asp">Forecast Menopause</a>
     <a href="/contact.asp">Contact Us</a>
-    <% if (locals.userid && locals.userid !== '') { %>
-      <a href="/logout.asp" class="ehw-nav__mobile-cta">Logout</a>
+    <% if (locals.consumerId) { %>
+      <a href="/dashboard">My Dashboard</a>
+      <a href="/consumer-logout" class="ehw-nav__mobile-cta">Sign Out</a>
     <% } else { %>
-      <a href="/bmdlogin.asp" class="ehw-nav__mobile-cta">BMD Calculator Login</a>
+      <a href="/login" class="ehw-nav__mobile-cta">Sign In / Create Account</a>
+    <% } %>
+    <% if (locals.userid && locals.userid !== '') { %>
+      <a href="/logout.asp" style="font-size:13px;opacity:.7;padding:8px 16px;">BMD Clinic Logout</a>
+    <% } else { %>
+      <a href="/bmdlogin.asp" style="font-size:13px;opacity:.7;padding:8px 16px;">BMD Clinic Login</a>
     <% } %>
   </div>
 </nav>

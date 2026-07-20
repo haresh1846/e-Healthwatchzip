@@ -1,0 +1,94 @@
+<%- include('partials/header', { pageTitle: 'Menopause Forecast — e-healthwatch', pageDesc: 'Enter your AMH value to receive your personalised menopause forecast.' }) %>
+
+<div class="dash-bg">
+
+  <!-- Banner -->
+  <section id="banner-section">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="banner-placeholder text-center">
+          <h2>Menopause Forecasting</h2>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="dash-body" style="max-width:760px;">
+
+    <!-- Profile context -->
+    <div class="forecast-profile-bar">
+      <a href="/profile/<%= profile.id %>" class="auth-back">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Back
+      </a>
+      <span>Test for: <strong><%= profile.display_name %></strong> (<%= profile.relationship_label %>)</span>
+    </div>
+
+    <!-- Payment summary -->
+    <div class="pay-summary-card">
+      <div class="pay-summary-left">
+        <div class="pay-summary-title">Menopause Forecast</div>
+        <div class="pay-summary-desc">Personal prediction based on AMH + age + cycle pattern</div>
+        <ul class="pay-summary-features">
+          <li>✓ Estimated age of menopause onset</li>
+          <li>✓ Personalised to <%= profile.display_name %>'s data</li>
+          <li>✓ Result stored — view anytime for free</li>
+          <li>✓ Medical disclaimer & interpretation guide included</li>
+        </ul>
+      </div>
+      <div class="pay-summary-right">
+        <div class="pay-price-main">₹49</div>
+        <del class="pay-price-orig">₹199</del>
+        <div class="pay-price-tag">75% off · One-time</div>
+      </div>
+    </div>
+
+    <!-- Form -->
+    <div class="forecast-form-card">
+      <h2 style="font-family:var(--font-serif);font-size:22px;margin-bottom:6px;">Enter your details</h2>
+      <p style="color:var(--stone);font-size:14px;margin-bottom:24px;">All fields are required. Your AMH value should be from a blood test taken within the last 12 months.</p>
+
+      <% if (typeof error !== 'undefined' && error) { %>
+        <div class="auth-alert"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/forecast/<%= profile.id %>">
+
+        <div class="auth-field">
+          <label for="Txt_age">Current age (years)</label>
+          <input type="number" id="Txt_age" name="Txt_age" required min="18" max="60" placeholder="e.g. 38" class="form-control">
+        </div>
+
+        <div class="auth-field">
+          <label for="cmbperiods">Menstrual cycle</label>
+          <select id="cmbperiods" name="cmbperiods" class="form-control" required>
+            <option value="">Select…</option>
+            <option value="R">Regular (cycle every 21–35 days)</option>
+            <option value="I">Irregular</option>
+          </select>
+        </div>
+
+        <div class="auth-field">
+          <label for="Txt_amh">AMH value (ng/mL)</label>
+          <input type="number" id="Txt_amh" name="Txt_amh" required step="0.01" min="0.01" max="20" placeholder="e.g. 2.50" class="form-control">
+          <span class="auth-field-hint">Normal range: 0.9 – 9.5 ng/mL. Convert pmol/L → ng/mL: divide by 7.14.</span>
+        </div>
+
+        <div class="pay-disclaimer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>This is a <strong>predictive estimate</strong>, not a medical diagnosis. Always consult your gynaecologist for clinical advice.</span>
+        </div>
+
+        <button type="submit" class="auth-submit" style="margin-top:8px;">
+          Pay ₹49 &amp; Get My Forecast →
+        </button>
+        <p style="text-align:center;font-size:12px;color:var(--stone-400);margin-top:10px;">
+          🔒 Secure · No subscription · Result stored permanently on your profile
+        </p>
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

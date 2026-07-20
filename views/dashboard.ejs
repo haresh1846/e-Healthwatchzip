@@ -1,0 +1,104 @@
+<%- include('partials/header', { pageTitle: 'My Dashboard — e-healthwatch', pageDesc: 'Manage your health profiles and access your menopause forecast results.' }) %>
+
+<div class="dash-bg">
+
+  <!-- Dashboard header -->
+  <div class="dash-header">
+    <div class="dash-header-inner">
+      <div>
+        <p class="dash-greeting">Welcome back,</p>
+        <h1 class="dash-name"><%= consumerName %></h1>
+      </div>
+      <a href="/consumer-logout" class="dash-logout">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </a>
+    </div>
+  </div>
+
+  <div class="dash-body">
+
+    <!-- What is this -->
+    <div class="dash-intro">
+      <h2>Your Health Profiles</h2>
+      <p>Each profile tracks a separate person's menopause forecast. You can add up to 3 — for yourself, your mother, or your sister.</p>
+    </div>
+
+    <!-- Profile grid -->
+    <div class="dash-profiles">
+
+      <% profiles.forEach(function(p, i) { %>
+      <a href="/profile/<%= p.id %>" class="profile-tile">
+        <div class="profile-tile__avatar profile-tile__avatar--<%= ['rose','amber','purple'][i % 3] %>">
+          <%= p.display_name.charAt(0).toUpperCase() %>
+        </div>
+        <div class="profile-tile__info">
+          <div class="profile-tile__name"><%= p.display_name %></div>
+          <div class="profile-tile__rel"><%= p.relationship_label %></div>
+        </div>
+        <div class="profile-tile__status">
+          <% if (p.hasPaidResult) { %>
+            <span class="profile-tile__badge profile-tile__badge--done">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Result ready
+            </span>
+          <% } else { %>
+            <span class="profile-tile__badge profile-tile__badge--pending">
+              Take test · ₹49
+            </span>
+          <% } %>
+        </div>
+        <div class="profile-tile__arrow">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+      <% }); %>
+
+      <% if (profiles.length < 3) { %>
+      <a href="/profile/new" class="profile-tile profile-tile--add">
+        <div class="profile-tile__add-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+        <div class="profile-tile__info">
+          <div class="profile-tile__name">Add a profile</div>
+          <div class="profile-tile__rel">Self · Mother · Sister · Other</div>
+        </div>
+        <div class="profile-tile__arrow" style="opacity:.4;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </a>
+      <% } %>
+
+      <% if (profiles.length === 0) { %>
+      <div class="dash-empty">
+        <div class="dash-empty-icon">👋</div>
+        <h3>Start by adding a profile</h3>
+        <p>Create a profile for yourself, your mother, or your sister to begin forecasting.</p>
+        <a href="/profile/new" class="auth-submit" style="display:inline-flex;width:auto;margin-top:8px;">Add your first profile →</a>
+      </div>
+      <% } %>
+
+    </div>
+
+    <!-- How it works strip -->
+    <div class="dash-how">
+      <div class="dash-how-step">
+        <span class="dash-how-num">1</span>
+        <div><strong>Select a profile</strong><p>Or create one for yourself or a family member</p></div>
+      </div>
+      <div class="dash-how-divider"></div>
+      <div class="dash-how-step">
+        <span class="dash-how-num">2</span>
+        <div><strong>Enter your AMH value</strong><p>From your latest blood test report</p></div>
+      </div>
+      <div class="dash-how-divider"></div>
+      <div class="dash-how-step">
+        <span class="dash-how-num">3</span>
+        <div><strong>Pay ₹49 · Get your forecast</strong><p>One-time payment. View your result anytime, free forever</p></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

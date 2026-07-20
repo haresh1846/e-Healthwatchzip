@@ -1,0 +1,81 @@
+<%- include('partials/header', { pageTitle: 'Your Menopause Forecast — e-healthwatch', pageDesc: 'Your personalised menopause forecast result from e-healthwatch.' }) %>
+
+<div class="dash-bg">
+
+  <section id="banner-section">
+    <div class="container-fluid">
+      <div class="banner-placeholder text-center">
+        <h2>Your Menopause Forecast</h2>
+      </div>
+    </div>
+  </section>
+
+  <div class="dash-body" style="max-width:720px;">
+
+    <a href="/profile/<%= profile.id %>" class="auth-back" style="margin-bottom:24px;display:inline-flex;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to <%= profile.display_name %>'s profile
+    </a>
+
+    <!-- Main result card -->
+    <div class="result-hero-card">
+      <div class="result-hero-top">
+        <div class="result-profile-pill">
+          <span class="result-profile-avatar"><%= profile.display_name.charAt(0).toUpperCase() %></span>
+          <span><%= profile.display_name %> · <%= profile.relationship_label %></span>
+        </div>
+        <span class="result-date-pill">Tested: <%= new Date(createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) %></span>
+      </div>
+
+      <div class="result-big-number">
+        <div class="result-age"><%= result.forecastAge %></div>
+        <div class="result-age-label">Estimated age of menopause onset</div>
+      </div>
+
+      <div class="result-inputs">
+        <div class="result-input-chip">Age at test: <strong><%= input.age %> yrs</strong></div>
+        <div class="result-input-chip">AMH: <strong><%= input.amh %> ng/mL</strong></div>
+        <div class="result-input-chip">Cycle: <strong><%= input.periods %></strong></div>
+      </div>
+    </div>
+
+    <!-- Interpretation -->
+    <div class="result-interp-card">
+      <h3>What does this mean?</h3>
+      <% const diff = result.forecastAge - parseInt(input.age); %>
+      <% if (diff > 15) { %>
+        <p>Based on your AMH level of <strong><%= input.amh %> ng/mL</strong>, your ovarian reserve appears well-preserved. You have an estimated <strong><%= diff %> years</strong> before natural menopause onset — well within the expected range for your current age.</p>
+      <% } else if (diff > 8) { %>
+        <p>Your AMH level of <strong><%= input.amh %> ng/mL</strong> suggests a typical ovarian reserve for your age. Your estimated timeline of <strong><%= diff %> years</strong> to menopause is within the normal range.</p>
+      <% } else { %>
+        <p>Your AMH level of <strong><%= input.amh %> ng/mL</strong> suggests your ovarian reserve may be lower than average for your age. We recommend discussing this result with your gynaecologist, who can provide a full clinical assessment.</p>
+      <% } %>
+
+      <div class="result-fact-grid">
+        <div class="result-fact">
+          <div class="result-fact-icon">📊</div>
+          <div><strong>AMH accuracy</strong><p>AMH is the most reliable single biomarker for predicting menopause timing, outperforming FSH and AFC in long-term studies.</p></div>
+        </div>
+        <div class="result-fact">
+          <div class="result-fact-icon">🔄</div>
+          <div><strong>Track over time</strong><p>Retake the test with an updated AMH value (₹49) to see how your forecast changes. AMH naturally declines with age.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="result-disclaimer">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span>This forecast is a <strong>statistical estimate</strong> based on published research. It is not a clinical diagnosis. Individual results may vary based on health conditions, medications, and genetic factors. Please consult your gynaecologist for personalised medical advice.</span>
+    </div>
+
+    <!-- Actions -->
+    <div class="result-actions">
+      <a href="/forecast/<%= profile.id %>" class="result-retake">Retake with new AMH value · ₹49</a>
+      <a href="/dashboard" class="auth-submit" style="display:inline-flex;width:auto;">Back to Dashboard →</a>
+    </div>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

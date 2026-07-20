@@ -1,0 +1,102 @@
+<%- include('partials/header', { pageTitle: profile.display_name + ' — e-healthwatch' }) %>
+
+<div class="dash-bg">
+
+  <!-- Profile hero -->
+  <div class="prof-hero">
+    <div class="prof-hero-inner">
+      <a href="/dashboard" class="auth-back" style="margin-bottom:20px;display:inline-flex;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        All profiles
+      </a>
+      <div class="prof-avatar-row">
+        <div class="prof-avatar"><%= profile.display_name.charAt(0).toUpperCase() %></div>
+        <div>
+          <h1 class="prof-name"><%= profile.display_name %></h1>
+          <span class="prof-rel"><%= profile.relationship_label %></span>
+          <% if (profile.date_of_birth) { %><span class="prof-dob">DOB: <%= profile.date_of_birth %></span><% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-body">
+
+    <% if (testResult) { %>
+    <!-- Result is available -->
+    <div class="test-card test-card--done">
+      <div class="test-card-header">
+        <div class="test-card-icon test-card-icon--green">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div>
+          <h2 class="test-card-title">Menopause Forecast</h2>
+          <p class="test-card-sub">Result available · <a href="/my-result/<%= profile.id %>">View full result</a></p>
+        </div>
+      </div>
+      <div class="test-result-preview">
+        <div class="test-result-number"><%= testResult.forecastAge %></div>
+        <div class="test-result-label">Estimated age of menopause onset</div>
+      </div>
+      <div class="test-card-actions">
+        <a href="/my-result/<%= profile.id %>" class="auth-submit" style="display:inline-flex;width:auto;">View Full Result →</a>
+        <a href="/forecast/<%= profile.id %>" class="prof-retake">Retake with new AMH value · ₹49</a>
+      </div>
+    </div>
+
+    <% } else { %>
+    <!-- No result yet -->
+    <div class="test-card test-card--untaken">
+      <div class="test-card-header">
+        <div class="test-card-icon test-card-icon--rose">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div>
+          <h2 class="test-card-title">Menopause Forecast Test</h2>
+          <p class="test-card-sub">Not yet taken</p>
+        </div>
+      </div>
+
+      <p class="test-card-desc">
+        Using your <strong>AMH (Anti-Müllerian Hormone)</strong> blood test value, age, and cycle regularity, our mathematical model estimates your age of natural menopause onset. Get your AMH tested at any diagnostic lab — results typically cost ₹800–₹1,500.
+      </p>
+
+      <div class="test-what-you-need">
+        <div class="test-need-item">
+          <span class="test-need-icon">🩸</span>
+          <div><strong>Your AMH value</strong><span>From your blood test report (in ng/mL or pmol/L)</span></div>
+        </div>
+        <div class="test-need-item">
+          <span class="test-need-icon">🎂</span>
+          <div><strong>Your current age</strong><span>At the time of the AMH test</span></div>
+        </div>
+        <div class="test-need-item">
+          <span class="test-need-icon">📅</span>
+          <div><strong>Cycle regularity</strong><span>Whether your periods are regular or irregular</span></div>
+        </div>
+      </div>
+
+      <div class="test-price-row">
+        <div class="test-price-info">
+          <span class="test-price-main">₹49</span>
+          <del>₹199</del>
+          <span class="test-price-tag">75% off · One-time payment</span>
+        </div>
+        <a href="/forecast/<%= profile.id %>" class="auth-submit" style="display:inline-flex;width:auto;">
+          Take the Test →
+        </a>
+      </div>
+    </div>
+    <% } %>
+
+    <!-- What is AMH info box -->
+    <div class="prof-info-box">
+      <h3>What is AMH and where do I get it tested?</h3>
+      <p>Anti-Müllerian Hormone (AMH) is produced by follicles in your ovaries. Its level reflects your ovarian reserve — the number of eggs remaining. As you age, AMH naturally decreases, and this decline predicts menopause timing with high accuracy.</p>
+      <p style="margin-top:12px;">You can get an AMH blood test at any NABL-accredited diagnostic lab (e.g. SRL, Dr Lal PathLabs, Metropolis) — no doctor's prescription required. Results are usually available within 24–48 hours.</p>
+    </div>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

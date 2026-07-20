@@ -1,0 +1,45 @@
+<%- include('partials/header', { pageTitle: 'Add Profile — e-healthwatch' }) %>
+
+<div class="auth-bg">
+  <div class="auth-wrap auth-wrap--narrow">
+    <div class="auth-card">
+
+      <a href="/dashboard" class="auth-back">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Back to dashboard
+      </a>
+
+      <h1 class="auth-title" style="margin-top:20px;">Add a profile</h1>
+      <p class="auth-sub">You can add up to 3 profiles — for yourself, your mother, or your sister.</p>
+
+      <% if (typeof error !== 'undefined' && error) { %>
+        <div class="auth-alert"><%= error %></div>
+      <% } %>
+
+      <form method="POST" action="/profile/new" class="auth-form">
+        <div class="auth-field">
+          <label for="display_name">Name</label>
+          <input type="text" id="display_name" name="display_name" required placeholder="e.g. Priya, Mum, Anita" class="form-control">
+        </div>
+        <div class="auth-field">
+          <label for="relationship_label">Relationship</label>
+          <select id="relationship_label" name="relationship_label" class="form-control">
+            <option value="Self">Self</option>
+            <option value="Mother">Mother</option>
+            <option value="Sister">Sister</option>
+            <option value="Daughter">Daughter</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="auth-field">
+          <label for="date_of_birth">Date of birth <span style="font-weight:400;color:var(--stone);">(optional)</span></label>
+          <input type="date" id="date_of_birth" name="date_of_birth" class="form-control">
+        </div>
+        <button type="submit" class="auth-submit">Create Profile →</button>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
