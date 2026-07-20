@@ -1392,3 +1392,37 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   .fgated-layout         { grid-template-columns: 1fr; }
   .fgated-info           { display: none; }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   PRINT STYLES  — hide site chrome; works on any EJS page with the
+   shared header/footer partials, and on the standalone bmd-report.
+   ══════════════════════════════════════════════════════════════════ */
+@media print {
+  /* Hide navigation, footer, banners, and action buttons */
+  .ehw-nav,
+  .ehw-nav__mobile,
+  .ehw-footer,
+  #banner-section,
+  .no-print { display: none !important; }
+
+  /* Reset page background to plain white */
+  html, body { background: #fff !important; color: #000 !important; }
+
+  /* Remove decorative shadows / blurs that waste ink */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Ensure colour badges/backgrounds print correctly */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Remove top padding left by sticky nav */
+  body { padding-top: 0 !important; }
+
+  a { text-decoration: none; color: inherit; }
+
+  /* Page margins */
+  @page { margin: 18mm 16mm; }
+}

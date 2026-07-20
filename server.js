@@ -443,6 +443,53 @@ app.get('/result.asp', (req, res) => {
   });
 });
 
+// BMD Report – printable page for a specific record
+app.get('/bmd-report/:id', (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+
+  const record = db.prepare(
+    'SELECT * FROM bmd WHERE id = ? AND clinic_username = ?'
+  ).get(req.params.id, req.session.userid);
+
+  if (!record) return res.redirect('/bmd-history');
+
+  const h = parseFloat(record.height), w = parseFloat(record.weight);
+  const a = parseFloat(record.age), hal = parseFloat(record.hal), nsa = parseFloat(record.nsa);
+
+  const bmdScore = parseFloat((
+    1.06861 *
+    Math.pow(h * 0.01, 0.326842) *
+    Math.pow(w, 0.211909) *
+    Math.pow(hal, 0.0608258) *
+    Math.pow(a, -0.332916) *
+    Math.pow(nsa * 0.0174533, -0.239446)
+  ).toFixed(4));
+
+  let classification, classColor, classNote;
+  if (bmdScore >= 0.738) {
+    classification = 'Normal';       classColor = 'green';
+    classNote = 'Bone density is within the normal range. Maintain with regular weight-bearing exercise and adequate calcium intake.';
+  } else if (bmdScore >= 0.558) {
+    classification = 'Osteopenia';   classColor = 'amber';
+    classNote = 'Bone density is lower than normal. Consider lifestyle modifications, dietary calcium, vitamin D supplementation, and a DEXA scan for monitoring.';
+  } else {
+    classification = 'Osteoporosis'; classColor = 'rose';
+    classNote = 'Bone density is significantly reduced. Refer to a specialist for DEXA scan, pharmacological assessment, and fracture risk evaluation.';
+  }
+
+  const printDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  res.render('bmd-report', {
+    record,
+    result: bmdScore.toFixed(4),
+    classification,
+    classColor,
+    classNote,
+    clinicUser: req.session.userid,
+    printDate,
+  });
+});
+
 // BMD History – all records for this clinic
 app.get('/bmd-history', (req, res) => {
   if (!req.session.userid) return res.redirect('/bmdlogin.asp');
