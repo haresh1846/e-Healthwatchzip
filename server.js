@@ -239,6 +239,14 @@ function requireConsumer(req, res, next) {
   next();
 }
 
+// Clinic auth guard — accounts still on the seeded default password are
+// forced through /clinic-password before they can use any clinic page.
+function requireClinic(req, res, next) {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  if (req.session.mustChangePassword) return res.redirect('/clinic-password');
+  next();
+}
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 // Home – GET
@@ -355,7 +363,40 @@ app.post('/bmdlogin.asp', async (req, res) => {
   }
 
   req.session.userid = user.username;
+
+  // The seeded default credentials are publicly documented — force a change
+  // before this account can use any clinic page.
+  if (user.username === 'admin' && txtpwd === 'admin123') {
+    req.session.mustChangePassword = true;
+    return res.redirect('/clinic-password');
+  }
+
   return res.redirect('/clinic-dashboard');
+});
+
+// Forced password change for clinic accounts on default credentials
+app.get('/clinic-password', (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  res.render('clinic-password', { error: null, username: req.session.userid });
+});
+app.post('/clinic-password', async (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  const username = req.session.userid;
+  const { new_password, confirm_password } = req.body;
+  if (!new_password || new_password.length < 8) {
+    return res.render('clinic-password', { error: 'Password must be at least 8 characters.', username });
+  }
+  if (new_password !== confirm_password) {
+    return res.render('clinic-password', { error: 'Passwords do not match.', username });
+  }
+  if (new_password === 'admin123') {
+    return res.render('clinic-password', { error: 'Please choose a password different from the default one.', username });
+  }
+  const hash = await bcrypt.hash(new_password, 12);
+  db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
+  console.log(`[BMD] Default password replaced for clinic account: ${username}`);
+  req.session.mustChangePassword = false;
+  res.redirect('/clinic-dashboard');
 });
 
 // BMD Logout
@@ -365,9 +406,7 @@ app.get('/bmdlogout', (req, res) => {
 });
 
 // Clinic Dashboard – GET (auth required)
-app.get('/clinic-dashboard', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-
+app.get('/clinic-dashboard', requireClinic, (req, res) => {
   const account = db.prepare(
     'SELECT username, limitavailable, expirydate FROM bmdlogin WHERE username = ?'
   ).get(req.session.userid);
@@ -415,15 +454,13 @@ app.get('/clinic-dashboard', (req, res) => {
 });
 
 // BMD Calculator – GET (auth required)
-app.get('/bmd.asp', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/bmd.asp', requireClinic, (req, res) => {
   req.session.guid = uuidv4();
   res.render('bmd', { bmdError: req.query.error || null });
 });
 
 // BMD Save – POST
-app.post('/bmdsave.asp', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.post('/bmdsave.asp', requireClinic, (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
   const user = db.prepare(
@@ -475,8 +512,7 @@ app.post('/bmdsave.asp', (req, res) => {
 });
 
 // BMD Result
-app.get('/result.asp', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/result.asp', requireClinic, (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
   const guid = req.session.guid;
@@ -534,9 +570,7 @@ app.get('/result.asp', (req, res) => {
 });
 
 // BMD Report – printable page for a specific record
-app.get('/bmd-report/:id', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-
+app.get('/bmd-report/:id', requireClinic, (req, res) => {
   const record = db.prepare(
     'SELECT * FROM bmd WHERE id = ? AND clinic_username = ?'
   ).get(req.params.id, req.session.userid);
@@ -581,8 +615,7 @@ app.get('/bmd-report/:id', (req, res) => {
 });
 
 // BMD History – all records for this clinic
-app.get('/bmd-history', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/bmd-history', requireClinic, (req, res) => {
   const records = db.prepare(
     "SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC"
   ).all(req.session.userid);
@@ -590,8 +623,7 @@ app.get('/bmd-history', (req, res) => {
 });
 
 // BMD History – per-patient view
-app.get('/bmd-patient/:name', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/bmd-patient/:name', requireClinic, (req, res) => {
   const name = req.params.name;
   const records = db.prepare(
     "SELECT * FROM bmd WHERE clinic_username = ? AND LOWER(name) = LOWER(?) ORDER BY id DESC"
@@ -1232,8 +1264,8 @@ app.post('/admin/clinic/:username/password', requireAdmin, async (req, res) => {
   const { username } = req.params;
   const { new_password } = req.body;
 
-  if (!new_password || new_password.length < 4) {
-    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 4 characters.' };
+  if (!new_password || new_password.length < 8) {
+    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 8 characters.' };
     return res.redirect('/admin/clinic');
   }
 
