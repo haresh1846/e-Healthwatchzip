@@ -203,6 +203,34 @@ app.use((req, res, next) => {
   next();
 });
 
+// ─── Login rate limiting ─────────────────────────────────────────────────────
+// Fixed-window in-memory limiter — enough to blunt credential stuffing on a
+// single-process deployment without adding a dependency.
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const rateBuckets = new Map();
+
+function rateLimited(bucket) {
+  const now = Date.now();
+  const entry = rateBuckets.get(bucket);
+  if (!entry || now - entry.start > RATE_LIMIT_WINDOW_MS) {
+    rateBuckets.set(bucket, { start: now, count: 1 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > RATE_LIMIT_MAX;
+}
+
+const rateLimitSweep = setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateBuckets) {
+    if (now - entry.start > RATE_LIMIT_WINDOW_MS) rateBuckets.delete(key);
+  }
+}, 60 * 1000);
+if (rateLimitSweep.unref) rateLimitSweep.unref();
+
+const RATE_LIMIT_MESSAGE = 'Too many attempts. Please wait 15 minutes and try again.';
+
 // Consumer auth guard
 function requireConsumer(req, res, next) {
   if (!req.session.consumerId) {
@@ -279,6 +307,10 @@ app.get('/bmdlogin.asp', (req, res) => {
 
 // BMD Login – POST
 app.post('/bmdlogin.asp', async (req, res) => {
+  if (rateLimited('bmdlogin:' + req.ip)) {
+    return res.status(429).render('bmdlogin', { msg: RATE_LIMIT_MESSAGE });
+  }
+
   const { validate1, txtusername, txtpwd } = req.body;
 
   if (validate1 !== 'T') {
@@ -575,6 +607,9 @@ app.get('/signup', (req, res) => {
   res.render('signup', { error: null });
 });
 app.post('/signup', async (req, res) => {
+  if (rateLimited('signup:' + req.ip)) {
+    return res.status(429).render('signup', { error: RATE_LIMIT_MESSAGE });
+  }
   const { full_name, email, password, confirm_password, consent } = req.body;
   if (!consent)                   return res.render('signup', { error: 'You must accept the privacy policy to continue.' });
   if (!password || password.length < 8) return res.render('signup', { error: 'Password must be at least 8 characters.' });
@@ -601,6 +636,9 @@ app.get('/login', (req, res) => {
 app.post('/login', async (req, res) => {
   const { email, password, next } = req.body;
   const safeNext = (next && next.startsWith('/') && !next.startsWith('//')) ? next : '/dashboard';
+  if (rateLimited('login:' + req.ip)) {
+    return res.status(429).render('consumer-login', { error: RATE_LIMIT_MESSAGE, next: safeNext });
+  }
   try {
     const consumer = db.prepare('SELECT * FROM consumers WHERE email = ?').get(email);
     if (!consumer) return res.render('consumer-login', { error: 'No account found with this email.', next: safeNext });
@@ -977,6 +1015,9 @@ app.get('/admin/login', (req, res) => {
 
 // POST /admin/login
 app.post('/admin/login', (req, res) => {
+  if (rateLimited('admin:' + req.ip)) {
+    return res.status(429).render('admin/login', { error: RATE_LIMIT_MESSAGE });
+  }
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
