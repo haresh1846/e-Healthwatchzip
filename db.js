@@ -163,9 +163,13 @@ async function init() {
 
 // Memoized: server code awaits db.ready before serving requests, so schema
 // setup runs exactly once per process (including serverless cold starts).
-db.ready = init().catch(err => {
-  console.error('[DB] Initialisation failed:', err);
-  throw err;
+db.ready = init();
+// Attach a logging handler WITHOUT replacing db.ready — a bare rejected
+// promise at module scope is an unhandled rejection, which kills a serverless
+// process before any request can observe the error. With this handler the
+// failure surfaces per-request through the db.ready gate instead.
+db.ready.catch(err => {
+  console.error('[DB] Initialisation failed:', err && err.message ? err.message : err);
 });
 
 module.exports = db;

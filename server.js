@@ -1715,6 +1715,17 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
   });
 });
 
+// Final error handler — logs the real error, shows the visitor a clean page,
+// and (until launch is stable) includes the message to make remote debugging
+// possible without dashboard access.
+app.use((err, req, res, next) => {
+  console.error('[error]', req.method, req.path, err);
+  if (res.headersSent) return next(err);
+  res.status(500).type('text/plain').send(
+    'Server error on ' + req.method + ' ' + req.path + ':\n' + (err && err.message ? err.message : String(err))
+  );
+});
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 // Listen only when run directly (node server.js). On Vercel the app is
 // imported by api/index.js and invoked per-request instead.
