@@ -1,4 +1,9 @@
-const { createClient } = require('@libsql/client');
+// With a remote Turso URL use the fetch-based web client — pure JS, no native
+// bindings, which is what serverless bundlers (Vercel) can actually ship. The
+// default client (which supports file: URLs) is only needed for local files.
+const { createClient } = process.env.TURSO_DATABASE_URL
+  ? require('@libsql/client/web')
+  : require('@libsql/client');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
