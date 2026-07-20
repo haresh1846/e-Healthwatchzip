@@ -711,7 +711,11 @@ app.post('/signup', async (req, res) => {
 // Sign in
 app.get('/login', (req, res) => {
   if (req.session.consumerId) return res.redirect('/dashboard');
-  res.render('consumer-login', { error: null, next: req.query.next || '/dashboard' });
+  res.render('consumer-login', {
+    error: null,
+    info: req.query.reset === '1' ? 'Your password has been reset. Sign in with your new password.' : null,
+    next: req.query.next || '/dashboard',
+  });
 });
 app.post('/login', async (req, res) => {
   const { email, password, next } = req.body;
@@ -731,6 +735,93 @@ app.post('/login', async (req, res) => {
     console.error('[login error]', err);
     res.render('consumer-login', { error: 'Something went wrong. Please try again.', next: safeNext });
   }
+});
+
+// ─── Password reset ──────────────────────────────────────────────────────────
+
+async function sendPasswordResetEmail(req, consumer) {
+  const token   = crypto.randomBytes(24).toString('hex');
+  const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  db.prepare('UPDATE consumers SET reset_token = ?, reset_token_expires = ? WHERE id = ?')
+    .run(token, expires, consumer.id);
+
+  const link = `${appBaseUrl(req)}/reset-password/${token}`;
+  const transporter = createMailTransporter();
+  if (!transporter) {
+    console.warn('[password-reset] Email not configured — reset link for', consumer.email, 'is:', link);
+    return;
+  }
+  try {
+    await transporter.sendMail({
+      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      to:      consumer.email,
+      subject: 'Reset your password — e-healthwatch',
+      text: [
+        `Hello${consumer.full_name ? ' ' + consumer.full_name : ''},`,
+        ``,
+        `Someone requested a password reset for your e-healthwatch account.`,
+        `To choose a new password, open this link (valid for 1 hour):`,
+        ``,
+        link,
+        ``,
+        `If you did not request this, you can safely ignore this email — your password is unchanged.`,
+      ].join('\n'),
+    });
+    console.log('[password-reset] Reset email sent to', consumer.email);
+  } catch (err) {
+    console.error('[password-reset] Failed to send:', err.message);
+  }
+}
+
+app.get('/forgot-password', (req, res) => {
+  if (req.session.consumerId) return res.redirect('/dashboard');
+  res.render('forgot-password', { sent: false });
+});
+
+app.post('/forgot-password', async (req, res) => {
+  if (rateLimited('forgot:' + req.ip)) {
+    return res.status(429).render('forgot-password', { sent: true });
+  }
+  const email = String(req.body.email || '').trim();
+  const consumer = email ? db.prepare('SELECT id, email, full_name FROM consumers WHERE email = ?').get(email) : null;
+  if (consumer) {
+    await sendPasswordResetEmail(req, consumer);
+  }
+  // Always claim success so the form can't be used to enumerate accounts
+  res.render('forgot-password', { sent: true });
+});
+
+function findConsumerByResetToken(token) {
+  if (!token) return null;
+  const row = db.prepare('SELECT id, reset_token_expires FROM consumers WHERE reset_token = ?').get(token);
+  if (!row) return null;
+  if (row.reset_token_expires && row.reset_token_expires < new Date().toISOString()) return null;
+  return row;
+}
+
+app.get('/reset-password/:token', (req, res) => {
+  const consumer = findConsumerByResetToken(req.params.token);
+  res.render('reset-password', { tokenValid: !!consumer, token: req.params.token, error: null });
+});
+
+app.post('/reset-password/:token', async (req, res) => {
+  const token = req.params.token;
+  const consumer = findConsumerByResetToken(token);
+  if (!consumer) {
+    return res.render('reset-password', { tokenValid: false, token, error: null });
+  }
+  const { password, confirm_password } = req.body;
+  if (!password || password.length < 8) {
+    return res.render('reset-password', { tokenValid: true, token, error: 'Password must be at least 8 characters.' });
+  }
+  if (password !== confirm_password) {
+    return res.render('reset-password', { tokenValid: true, token, error: 'Passwords do not match.' });
+  }
+  const password_hash = await bcrypt.hash(password, 12);
+  db.prepare('UPDATE consumers SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?')
+    .run(password_hash, consumer.id);
+  console.log('[password-reset] Password updated for consumer id', consumer.id);
+  res.redirect('/login?reset=1');
 });
 
 // Email verification — link target from the verification email

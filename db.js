@@ -79,6 +79,10 @@ try { db.exec("ALTER TABLE consumers ADD COLUMN email_verified INTEGER DEFAULT 0
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token TEXT"); } catch (_) {}
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token_expires DATETIME"); } catch (_) {}
 
+// Password reset token columns (same pattern as verification above)
+try { db.exec("ALTER TABLE consumers ADD COLUMN reset_token TEXT"); } catch (_) {}
+try { db.exec("ALTER TABLE consumers ADD COLUMN reset_token_expires DATETIME"); } catch (_) {}
+
 // Add clinic_username and created_at to bmd table so records persist and can be
 // associated with the logged-in clinic account (safe no-op if columns already exist)
 try { db.exec("ALTER TABLE bmd ADD COLUMN clinic_username TEXT"); } catch (_) {}
