@@ -1,5 +1,9 @@
 <%- include('partials/header', { pageTitle: 'Menopause Forecast — e-healthwatch', pageDesc: 'Enter your AMH value to receive your personalised menopause forecast.' }) %>
 
+<% if (typeof razorpayOrder !== 'undefined' && razorpayOrder) { %>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<% } %>
+
 <div class="dash-bg">
 
   <!-- Banner -->
@@ -57,25 +61,32 @@
             <div class="auth-alert"><%= error %></div>
           <% } %>
 
-          <form method="POST" action="/forecast/<%= profile.id %>">
+          <%
+            const fv = (typeof formValues !== 'undefined' && formValues) ? formValues : {};
+            const hasOrder = typeof razorpayOrder !== 'undefined' && razorpayOrder;
+          %>
+
+          <% if (!hasOrder) { %>
+          <!-- Step 1: collect form data, POST to server to create Razorpay order -->
+          <form method="POST" action="/forecast/<%= profile.id %>" id="forecastForm">
 
             <div class="auth-field">
               <label for="Txt_age">Current age (years)</label>
-              <input type="number" id="Txt_age" name="Txt_age" required min="18" max="60" placeholder="e.g. 38" class="form-control">
+              <input type="number" id="Txt_age" name="Txt_age" required min="18" max="60" placeholder="e.g. 38" class="form-control" value="<%= fv.Txt_age || '' %>">
             </div>
 
             <div class="auth-field">
               <label for="cmbperiods">Menstrual cycle</label>
               <select id="cmbperiods" name="cmbperiods" class="form-control" required>
                 <option value="">Select…</option>
-                <option value="R">Regular (cycle every 21–35 days)</option>
-                <option value="I">Irregular</option>
+                <option value="R" <%= (fv.cmbperiods === 'R') ? 'selected' : '' %>>Regular (cycle every 21–35 days)</option>
+                <option value="I" <%= (fv.cmbperiods === 'I') ? 'selected' : '' %>>Irregular</option>
               </select>
             </div>
 
             <div class="auth-field">
               <label for="Txt_amh">AMH value (ng/mL)</label>
-              <input type="number" id="Txt_amh" name="Txt_amh" required step="0.01" min="0.01" max="20" placeholder="e.g. 2.50" class="form-control">
+              <input type="number" id="Txt_amh" name="Txt_amh" required step="0.01" min="0.01" max="20" placeholder="e.g. 2.50" class="form-control" value="<%= fv.Txt_amh || '' %>">
               <span class="auth-field-hint">AMH is measured in ng/mL. Normal range: 0.9–9.5 ng/mL.</span>
             </div>
 
@@ -91,6 +102,81 @@
               🔒 Secure · No subscription · Result stored permanently on your profile
             </p>
           </form>
+          <% } else { %>
+
+          <!-- Step 2: Order created — show summary + trigger Razorpay widget -->
+          <div style="margin-bottom:20px;padding:14px 16px;background:var(--sage-50, #f0f7f4);border:1px solid var(--sage-200, #c3ddd5);border-radius:10px;font-size:14px;color:var(--charcoal);">
+            <strong>✓ Details confirmed.</strong> Click the button below to complete your payment securely via Razorpay.
+          </div>
+
+          <div style="margin-bottom:16px;">
+            <div class="result-input-chip" style="display:inline-flex;margin-right:8px;margin-bottom:8px;">Age: <strong style="margin-left:4px;"><%= fv.Txt_age %> yrs</strong></div>
+            <div class="result-input-chip" style="display:inline-flex;margin-right:8px;margin-bottom:8px;">AMH: <strong style="margin-left:4px;"><%= fv.Txt_amh %> ng/mL</strong></div>
+            <div class="result-input-chip" style="display:inline-flex;margin-right:8px;margin-bottom:8px;">Cycle: <strong style="margin-left:4px;"><%= fv.cmbperiods === 'R' ? 'Regular' : 'Irregular' %></strong></div>
+          </div>
+
+          <!-- Hidden form that receives Razorpay callback data -->
+          <form id="rzpVerifyForm" method="POST" action="/forecast/<%= profile.id %>/verify">
+            <input type="hidden" id="rzp_order_id"   name="razorpay_order_id"   value="">
+            <input type="hidden" id="rzp_payment_id"  name="razorpay_payment_id"  value="">
+            <input type="hidden" id="rzp_signature"   name="razorpay_signature"   value="">
+          </form>
+
+          <button id="rzpPayBtn" class="auth-submit" style="margin-top:8px;" onclick="openRazorpay()">
+            Pay ₹49 Securely →
+          </button>
+          <p style="text-align:center;font-size:12px;color:var(--stone-400);margin-top:10px;">
+            🔒 Powered by Razorpay · UPI · Cards · Net Banking · Wallets
+          </p>
+
+          <div style="margin-top:12px;text-align:center;">
+            <a href="/forecast/<%= profile.id %>" style="font-size:13px;color:var(--stone);text-decoration:underline;">← Change my details</a>
+          </div>
+
+          <script>
+            function openRazorpay() {
+              var options = {
+                key:         '<%= razorpayKeyId %>',
+                amount:      <%= razorpayOrder.amount %>,
+                currency:    'INR',
+                name:        'e-healthwatch',
+                description: 'Menopause Forecast for <%= profile.display_name %>',
+                order_id:    '<%= razorpayOrder.id %>',
+                prefill: {
+                  name:  '<%= (typeof consumerName !== "undefined" ? consumerName : "").replace(/'/g, "\\'") %>',
+                  email: '<%= (typeof consumerEmail !== "undefined" ? consumerEmail : "").replace(/'/g, "\\'") %>',
+                },
+                theme: { color: '#7c9e8f' },
+                handler: function(response) {
+                  document.getElementById('rzp_order_id').value   = response.razorpay_order_id;
+                  document.getElementById('rzp_payment_id').value  = response.razorpay_payment_id;
+                  document.getElementById('rzp_signature').value   = response.razorpay_signature;
+                  document.getElementById('rzpVerifyForm').submit();
+                },
+                modal: {
+                  ondismiss: function() {
+                    var btn = document.getElementById('rzpPayBtn');
+                    btn.textContent = 'Pay ₹49 Securely →';
+                    btn.disabled = false;
+                  }
+                }
+              };
+              var rzp = new Razorpay(options);
+              rzp.on('payment.failed', function(response) {
+                alert('Payment failed: ' + response.error.description + '\nYou can try again by clicking the Pay button.');
+              });
+              rzp.open();
+              this.disabled = true;
+              this.textContent = 'Opening payment…';
+            }
+
+            // Auto-open the widget on page load
+            window.addEventListener('load', function() {
+              setTimeout(openRazorpay, 400);
+            });
+          </script>
+
+          <% } %>
         </div>
 
       </div>

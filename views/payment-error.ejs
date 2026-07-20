@@ -1,0 +1,39 @@
+<%- include('partials/header', { pageTitle: 'Payment Error — e-healthwatch', pageDesc: 'There was a problem processing your payment.' }) %>
+
+<div class="dash-bg">
+
+  <section id="banner-section">
+    <div class="container-fluid">
+      <div class="row">
+        <div class="banner-placeholder text-center">
+          <h2>Payment Error</h2>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="dash-body" style="max-width:600px;text-align:center;padding-top:48px;">
+
+    <div style="background:#fff;border-radius:16px;padding:40px 32px;box-shadow:0 2px 16px rgba(0,0,0,0.07);">
+      <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+      <h2 style="font-family:var(--font-serif);font-size:24px;margin-bottom:12px;color:var(--charcoal);">Payment could not be verified</h2>
+      <p style="color:var(--stone);font-size:15px;line-height:1.6;margin-bottom:28px;"><%= message %></p>
+
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <a href="/forecast/<%= profileId %>" class="auth-submit" style="display:inline-flex;width:auto;">
+          Try Again →
+        </a>
+        <a href="/dashboard" style="display:inline-flex;align-items:center;padding:12px 24px;border:1px solid var(--warm-200);border-radius:8px;color:var(--stone);text-decoration:none;font-size:14px;">
+          Back to Dashboard
+        </a>
+      </div>
+
+      <p style="margin-top:24px;font-size:12px;color:var(--stone-400);">
+        If you were charged but see this error, please contact us — we will sort it out within 24 hours.
+      </p>
+    </div>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>

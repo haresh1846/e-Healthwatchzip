@@ -4,7 +4,14 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const Razorpay = require('razorpay');
 const db = require('./db');
+
+const razorpay = new Razorpay({
+  key_id:     process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,6 +22,93 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Razorpay webhook — must be registered before bodyParser.json so it receives the raw body for HMAC verification
+app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  // Signature verification is mandatory. If RAZORPAY_WEBHOOK_SECRET is not set,
+  // reject all webhook calls — the endpoint is effectively disabled until configured.
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.warn('[Razorpay webhook] RAZORPAY_WEBHOOK_SECRET not configured — rejecting request');
+    return res.status(503).json({ error: 'Webhook not configured on this server' });
+  }
+
+  const sig = req.headers['x-razorpay-signature'];
+  if (!sig) {
+    return res.status(400).json({ error: 'Missing signature header' });
+  }
+
+  const expected = crypto
+    .createHmac('sha256', webhookSecret)
+    .update(req.body)
+    .digest('hex');
+
+  // Guard against length/type mismatch before timingSafeEqual (throws on different lengths)
+  let webhookSigValid = false;
+  try {
+    const sigBuf      = Buffer.from(sig,      'hex');
+    const expectedBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length > 0 && sigBuf.length === expectedBuf.length) {
+      webhookSigValid = crypto.timingSafeEqual(sigBuf, expectedBuf);
+    }
+  } catch (_) {
+    webhookSigValid = false;
+  }
+  if (!webhookSigValid) {
+    console.warn('[Razorpay webhook] Signature mismatch — request rejected');
+    return res.status(400).json({ error: 'Invalid signature' });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(req.body.toString());
+  } catch (e) {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+
+  if (event.event === 'payment.captured') {
+    const payment   = event?.payload?.payment?.entity;
+    if (!payment || !payment.order_id || !payment.id) {
+      console.warn('[Razorpay webhook] Malformed payment.captured payload');
+      return res.status(400).json({ error: 'Malformed payload' });
+    }
+
+    const orderId   = payment.order_id;
+    const paymentId = payment.id;
+
+    // Validate the order belongs to us, has the expected amount and currency,
+    // and is in a state that allows transitioning to paid (idempotent guard).
+    const orderRow = db.prepare(
+      "SELECT id, status, amount_paise FROM consumer_orders WHERE gateway_order_id = ?"
+    ).get(orderId);
+
+    if (!orderRow) {
+      console.warn('[Razorpay webhook] Order not found for gateway_order_id:', orderId);
+      // Return 200 to prevent Razorpay from retrying for unknown orders
+      return res.json({ status: 'unknown_order' });
+    }
+
+    // Guard: amount and currency must match our product (4900 paise, INR)
+    if (payment.amount !== 4900 || payment.currency !== 'INR') {
+      console.error('[Razorpay webhook] Amount/currency mismatch for order', orderId, {
+        amount: payment.amount, currency: payment.currency,
+      });
+      return res.status(400).json({ error: 'Amount or currency mismatch' });
+    }
+
+    // Idempotent: only update if not already paid
+    if (orderRow.status !== 'paid') {
+      db.prepare(
+        "UPDATE consumer_orders SET status = 'paid', gateway_payment_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?"
+      ).run(paymentId, orderRow.id);
+      console.log('[Razorpay webhook] Order marked paid via webhook:', orderId);
+    } else {
+      console.log('[Razorpay webhook] Order already paid, skipping update:', orderId);
+    }
+  }
+
+  res.json({ status: 'ok' });
+});
 
 // Body parser
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -259,25 +353,200 @@ app.get('/profile/:id', requireConsumer, (req, res) => {
 app.get('/forecast/:profileId', requireConsumer, (req, res) => {
   const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
-  res.render('forecast-gated', { profile, error: null });
+  res.render('forecast-gated', { profile, error: null, razorpayOrder: null, razorpayKeyId: null });
 });
-app.post('/forecast/:profileId', requireConsumer, (req, res) => {
+
+// Step 1: Validate form inputs → create Razorpay order → re-render with widget data
+app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
   const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
+
   const { Txt_age, cmbperiods, Txt_amh } = req.body;
-  if (!Txt_age || !cmbperiods || !Txt_amh) return res.render('forecast-gated', { profile, error: 'All fields are required.' });
-  const b0 = cmbperiods === 'R' ? 35.49 : 41.41;
-  const b1 = cmbperiods === 'R' ? 0.15  : 0.17;
-  const periods   = cmbperiods === 'R' ? 'Regular' : 'Irregular';
-  const amhvalue  = parseFloat(Txt_amh);
-  const fmvalue   = Math.round(b0 * Math.pow(amhvalue, b1));
-  // Phase 1: simulate payment (Razorpay integration in Phase 2)
-  const order = db.prepare('INSERT INTO consumer_orders (consumer_id, profile_id, status, paid_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(req.session.consumerId, profile.id, 'paid');
-  db.prepare('INSERT INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES (?, ?, ?, ?)').run(
-    order.lastInsertRowid, profile.id,
-    JSON.stringify({ age: Txt_age, amh: amhvalue, periods }),
-    JSON.stringify({ forecastAge: fmvalue, periods, amhvalue })
-  );
+  if (!Txt_age || !cmbperiods || !Txt_amh) {
+    return res.render('forecast-gated', { profile, error: 'All fields are required.', razorpayOrder: null, razorpayKeyId: null });
+  }
+
+  const ageNum = parseFloat(Txt_age);
+  const amhNum = parseFloat(Txt_amh);
+  if (isNaN(ageNum) || ageNum < 18 || ageNum > 60) {
+    return res.render('forecast-gated', { profile, error: 'Please enter a valid age between 18 and 60.', razorpayOrder: null, razorpayKeyId: null });
+  }
+  if (isNaN(amhNum) || amhNum <= 0 || amhNum > 20) {
+    return res.render('forecast-gated', { profile, error: 'Please enter a valid AMH value between 0.01 and 20 ng/mL.', razorpayOrder: null, razorpayKeyId: null });
+  }
+  if (cmbperiods !== 'R' && cmbperiods !== 'I') {
+    return res.render('forecast-gated', { profile, error: 'Please select a menstrual cycle type.', razorpayOrder: null, razorpayKeyId: null });
+  }
+
+  // Store form inputs in session for use after payment verification
+  req.session.pendingForecast = { profileId: profile.id, Txt_age, cmbperiods, Txt_amh };
+
+  try {
+    const consumer = db.prepare('SELECT email, full_name FROM consumers WHERE id = ?').get(req.session.consumerId);
+    const receipt  = `ehw_${profile.id}_${Date.now()}`;
+
+    // Create order in Razorpay
+    const rzpOrder = await razorpay.orders.create({
+      amount:   4900,
+      currency: 'INR',
+      receipt,
+      notes: {
+        consumer_id: String(req.session.consumerId),
+        profile_id:  String(profile.id),
+      },
+    });
+
+    // Persist the order record (status = created)
+    db.prepare(
+      'INSERT INTO consumer_orders (consumer_id, profile_id, status, gateway_order_id) VALUES (?, ?, ?, ?)'
+    ).run(req.session.consumerId, profile.id, 'created', rzpOrder.id);
+
+    // Key pendingForecast by gateway_order_id so multi-tab/multi-order scenarios
+    // cannot mix up form inputs belonging to different orders.
+    req.session.pendingForecast = {
+      gatewayOrderId: rzpOrder.id,
+      profileId: profile.id,
+      Txt_age, cmbperiods, Txt_amh,
+    };
+
+    res.render('forecast-gated', {
+      profile,
+      error: null,
+      razorpayOrder: {
+        id:     rzpOrder.id,
+        amount: rzpOrder.amount,
+      },
+      razorpayKeyId:    process.env.RAZORPAY_KEY_ID,
+      consumerEmail:    consumer ? consumer.email    : '',
+      consumerName:     consumer ? consumer.full_name || req.session.consumerName : req.session.consumerName,
+      formValues: { Txt_age, cmbperiods, Txt_amh },
+    });
+  } catch (err) {
+    console.error('[Razorpay order create error]', err);
+    res.render('forecast-gated', { profile, error: 'Payment gateway error. Please try again.', razorpayOrder: null, razorpayKeyId: null });
+  }
+});
+
+// Step 2: Verify Razorpay signature → run forecast → save result → redirect
+app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
+  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+  if (!profile) return res.redirect('/dashboard');
+
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).render('payment-error', { message: 'Missing payment fields. Please try again.', profileId: profile.id });
+  }
+
+  // Verify HMAC signature using timing-safe comparison
+  const expectedSig = crypto
+    .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+    .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+    .digest('hex');
+
+  let sigValid = false;
+  try {
+    sigValid = crypto.timingSafeEqual(Buffer.from(razorpay_signature, 'hex'), Buffer.from(expectedSig, 'hex'));
+  } catch (_) {
+    sigValid = false;
+  }
+  if (!sigValid) {
+    console.error('[Razorpay verify] Signature mismatch', { razorpay_order_id });
+    return res.status(400).render('payment-error', { message: 'Payment verification failed. If you were charged, please contact support.', profileId: profile.id });
+  }
+
+  // Retrieve pending forecast inputs — must be keyed to this exact gateway order
+  const pending = req.session.pendingForecast;
+  if (!pending || pending.gatewayOrderId !== razorpay_order_id || pending.profileId !== profile.id) {
+    return res.status(400).render('payment-error', { message: 'Session mismatch or expired. Please fill in the form again.', profileId: profile.id });
+  }
+
+  // Require the local order row to exist, belong to this consumer + profile, and still be in 'created' state.
+  // No fallback creation — fulfillment is only possible for server-created orders.
+  const orderRow = db.prepare(
+    "SELECT id, status, amount_paise FROM consumer_orders WHERE gateway_order_id = ? AND consumer_id = ? AND profile_id = ? AND status = 'created'"
+  ).get(razorpay_order_id, req.session.consumerId, profile.id);
+
+  if (!orderRow) {
+    // Order may have already been fulfilled via webhook before the browser callback arrived.
+    // Check if paid — if so, ensure a result row exists (backfill if session inputs are still present).
+    const alreadyPaid = db.prepare(
+      "SELECT id FROM consumer_orders WHERE gateway_order_id = ? AND consumer_id = ? AND profile_id = ? AND status = 'paid'"
+    ).get(razorpay_order_id, req.session.consumerId, profile.id);
+
+    if (alreadyPaid) {
+      // Check whether result was already written
+      const existingResult = db.prepare(
+        'SELECT id FROM mp_results_v2 WHERE order_id = ?'
+      ).get(alreadyPaid.id);
+
+      if (!existingResult) {
+        // Webhook marked order paid but result was never written (webhook-wins race).
+        // Backfill using session inputs if available.
+        const backfillPending = req.session.pendingForecast;
+        if (backfillPending && backfillPending.gatewayOrderId === razorpay_order_id && backfillPending.profileId === profile.id) {
+          const { Txt_age: bAge, cmbperiods: bPeriods, Txt_amh: bAmh } = backfillPending;
+          const bb0    = bPeriods === 'R' ? 35.49 : 41.41;
+          const bb1    = bPeriods === 'R' ? 0.15  : 0.17;
+          const bP     = bPeriods === 'R' ? 'Regular' : 'Irregular';
+          const bAmhV  = parseFloat(bAmh);
+          const bFm    = Math.round(bb0 * Math.pow(bAmhV, bb1));
+          db.prepare(
+            'INSERT OR IGNORE INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES (?, ?, ?, ?)'
+          ).run(
+            alreadyPaid.id, profile.id,
+            JSON.stringify({ age: bAge, amh: bAmhV, periods: bP }),
+            JSON.stringify({ forecastAge: bFm, periods: bP, amhvalue: bAmhV })
+          );
+          console.log('[Razorpay verify] Backfilled result for webhook-paid order:', razorpay_order_id);
+        } else {
+          // Session expired — result cannot be computed; user must contact support.
+          console.error('[Razorpay verify] Webhook-paid order missing result and session expired:', razorpay_order_id);
+          return res.status(400).render('payment-error', {
+            message: 'Your payment was received but your session expired before the result could be saved. Please contact support — we will generate your result manually within 24 hours.',
+            profileId: profile.id,
+          });
+        }
+      }
+
+      req.session.pendingForecast = null;
+      return res.redirect('/my-result/' + profile.id);
+    }
+
+    console.error('[Razorpay verify] No matching created order for', razorpay_order_id);
+    return res.status(400).render('payment-error', { message: 'Order not found or already processed. Please contact support if you were charged.', profileId: profile.id });
+  }
+
+  // Enforce expected amount for this product (4900 paise = ₹49)
+  if (orderRow.amount_paise !== 4900) {
+    console.error('[Razorpay verify] Amount mismatch on order', orderRow.id, orderRow.amount_paise);
+    return res.status(400).render('payment-error', { message: 'Order amount mismatch. Please contact support.', profileId: profile.id });
+  }
+
+  const { Txt_age, cmbperiods, Txt_amh } = pending;
+  const b0      = cmbperiods === 'R' ? 35.49 : 41.41;
+  const b1      = cmbperiods === 'R' ? 0.15  : 0.17;
+  const periods = cmbperiods === 'R' ? 'Regular' : 'Irregular';
+  const amhvalue = parseFloat(Txt_amh);
+  const fmvalue  = Math.round(b0 * Math.pow(amhvalue, b1));
+
+  // Mark order paid and persist result — both in one synchronous SQLite transaction
+  db.transaction(() => {
+    db.prepare(
+      "UPDATE consumer_orders SET status = 'paid', gateway_payment_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?"
+    ).run(razorpay_payment_id, orderRow.id);
+
+    db.prepare(
+      'INSERT OR IGNORE INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES (?, ?, ?, ?)'
+    ).run(
+      orderRow.id, profile.id,
+      JSON.stringify({ age: Txt_age, amh: amhvalue, periods }),
+      JSON.stringify({ forecastAge: fmvalue, periods, amhvalue })
+    );
+  })();
+
+  // Clear pending forecast from session
+  req.session.pendingForecast = null;
   res.redirect('/my-result/' + profile.id);
 });
 
