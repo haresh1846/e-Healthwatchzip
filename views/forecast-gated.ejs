@@ -68,8 +68,8 @@
 
           <% if (!hasOrder) { %>
           <!-- Step 1: collect form data, POST to server to create Razorpay order -->
-          <form method="POST" action="/forecast/<%= profile.id %>
-  <input type="hidden" name="_csrf" value="<%= csrfToken %>">" id="forecastForm">
+          <form method="POST" action="/forecast/<%= profile.id %>" id="forecastForm">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
 
             <div class="auth-field">
               <label for="Txt_age">Current age (years)</label>
@@ -117,8 +117,8 @@
           </div>
 
           <!-- Hidden form that receives Razorpay callback data -->
-          <form id="rzpVerifyForm" method="POST" action="/forecast/<%= profile.id %>
-  <input type="hidden" name="_csrf" value="<%= csrfToken %>">/verify">
+          <form id="rzpVerifyForm" method="POST" action="/forecast/<%= profile.id %>/verify">
+            <input type="hidden" name="_csrf" value="<%= csrfToken %>">
             <input type="hidden" id="rzp_order_id"   name="razorpay_order_id"   value="">
             <input type="hidden" id="rzp_payment_id"  name="razorpay_payment_id"  value="">
             <input type="hidden" id="rzp_signature"   name="razorpay_signature"   value="">

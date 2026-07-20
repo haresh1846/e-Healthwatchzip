@@ -240,9 +240,15 @@ function requireConsumer(req, res, next) {
 }
 
 // Clinic auth guard — accounts still on the seeded default password are
-// forced through /clinic-password before they can use any clinic page.
+// forced through /clinic-password before they can use any clinic page, and
+// accounts disabled by the admin are signed out even mid-session.
 function requireClinic(req, res, next) {
   if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  const acct = db.prepare('SELECT disabled FROM bmdlogin WHERE username = ?').get(req.session.userid);
+  if (!acct || acct.disabled) {
+    req.session.userid = null;
+    return res.redirect('/bmdlogin.asp?msg=' + encodeURIComponent('This account has been disabled. Please contact the administrator.'));
+  }
   if (req.session.mustChangePassword) return res.redirect('/clinic-password');
   next();
 }
@@ -373,11 +379,15 @@ app.post('/bmdlogin.asp', async (req, res) => {
   }
 
   const user = db.prepare(
-    "SELECT username, pwd, expirydate, limitavailable FROM bmdlogin WHERE username = ?"
+    "SELECT username, pwd, expirydate, limitavailable, disabled FROM bmdlogin WHERE username = ?"
   ).get(txtusername);
 
   if (!user) {
     return res.render('bmdlogin', { msg: 'Invalid user credentials. Please try again.' });
+  }
+
+  if (user.disabled) {
+    return res.render('bmdlogin', { msg: 'This account has been disabled. Please contact the administrator.' });
   }
 
   // Determine whether the stored value is a bcrypt hash or a legacy plain-text password.
@@ -1405,9 +1415,59 @@ app.get('/admin/bmd', requireAdmin, (req, res) => {
   res.render('admin/bmd', { records, ...getTabCounts() });
 });
 
+// POST /admin/clinic/create — new clinic account
+app.post('/admin/clinic/create', requireAdmin, async (req, res) => {
+  const username = String(req.body.username || '').trim();
+  const { password, expirydate, limitavailable } = req.body;
+
+  if (!/^[A-Za-z0-9_.-]{3,50}$/.test(username)) {
+    req.session.clinicFlash = { type: 'error', message: 'Username must be 3–50 characters (letters, numbers, dot, dash, underscore).' };
+    return res.redirect('/admin/clinic');
+  }
+  if (!password || password.length < 8) {
+    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 8 characters.' };
+    return res.redirect('/admin/clinic');
+  }
+  const limit = parseInt(limitavailable, 10);
+  if (isNaN(limit) || limit < 0) {
+    req.session.clinicFlash = { type: 'error', message: 'Scan limit must be a non-negative whole number.' };
+    return res.redirect('/admin/clinic');
+  }
+  if (expirydate && !/^\d{4}-\d{2}-\d{2}$/.test(expirydate)) {
+    req.session.clinicFlash = { type: 'error', message: 'Expiry date must be in YYYY-MM-DD format.' };
+    return res.redirect('/admin/clinic');
+  }
+  if (db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username)) {
+    req.session.clinicFlash = { type: 'error', message: `An account named "${username}" already exists.` };
+    return res.redirect('/admin/clinic');
+  }
+
+  const hash = await bcrypt.hash(password, 12);
+  db.prepare('INSERT INTO bmdlogin (username, pwd, expirydate, limitavailable) VALUES (?, ?, ?, ?)')
+    .run(username, hash, expirydate || null, limit);
+  console.log(`[Admin] Clinic account created: ${username}`);
+  req.session.clinicFlash = { type: 'success', message: `Clinic account "${username}" created.` };
+  res.redirect('/admin/clinic');
+});
+
+// POST /admin/clinic/:username/toggle — disable / re-enable an account
+app.post('/admin/clinic/:username/toggle', requireAdmin, (req, res) => {
+  const { username } = req.params;
+  const account = db.prepare('SELECT id, disabled FROM bmdlogin WHERE username = ?').get(username);
+  if (!account) {
+    req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
+    return res.redirect('/admin/clinic');
+  }
+  const newState = account.disabled ? 0 : 1;
+  db.prepare('UPDATE bmdlogin SET disabled = ? WHERE username = ?').run(newState, username);
+  console.log(`[Admin] Clinic account ${newState ? 'disabled' : 're-enabled'}: ${username}`);
+  req.session.clinicFlash = { type: 'success', message: `Account "${username}" ${newState ? 'disabled' : 're-enabled'}.` };
+  res.redirect('/admin/clinic');
+});
+
 // GET /admin/clinic
 app.get('/admin/clinic', requireAdmin, (req, res) => {
-  const rows = db.prepare('SELECT id, username, expirydate, limitavailable, pwd FROM bmdlogin ORDER BY id').all();
+  const rows = db.prepare('SELECT id, username, expirydate, limitavailable, disabled, pwd FROM bmdlogin ORDER BY id').all();
 
   const accounts = rows.map(r => ({
     ...r,

@@ -83,6 +83,9 @@ try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token_expires DATET
 try { db.exec("ALTER TABLE consumers ADD COLUMN reset_token TEXT"); } catch (_) {}
 try { db.exec("ALTER TABLE consumers ADD COLUMN reset_token_expires DATETIME"); } catch (_) {}
 
+// Clinic accounts can be disabled by the admin without deleting their data
+try { db.exec("ALTER TABLE bmdlogin ADD COLUMN disabled INTEGER DEFAULT 0"); } catch (_) {}
+
 // Add clinic_username and created_at to bmd table so records persist and can be
 // associated with the logged-in clinic account (safe no-op if columns already exist)
 try { db.exec("ALTER TABLE bmd ADD COLUMN clinic_username TEXT"); } catch (_) {}
