@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 const db = require('./db');
+const SqliteSessionStore = require('./session-store');
 
 // ─── Email transporter ────────────────────────────────────────────────────────
 // Lazily created so missing secrets don't crash startup; only contact form
@@ -23,13 +24,26 @@ function createMailTransporter() {
   });
 }
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Lazily created for the same reason as the mail transporter: the constructor
+// throws without keys, which would prevent the whole site from starting.
+let razorpayClient = null;
+function getRazorpay() {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) return null;
+  if (!razorpayClient) {
+    razorpayClient = new Razorpay({
+      key_id:     process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpayClient;
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Behind Replit's (or any host's) TLS-terminating proxy — needed so
+// `secure: 'auto'` session cookies detect HTTPS from X-Forwarded-Proto.
+app.set('trust proxy', 1);
 
 // View engine
 app.set('view engine', 'ejs');
@@ -130,11 +144,24 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // Session
+// A fixed fallback secret would let anyone forge session cookies, so without
+// SESSION_SECRET we use a random per-boot secret (sessions reset on restart).
+const sessionSecret = process.env.SESSION_SECRET || (() => {
+  console.warn('[session] SESSION_SECRET is not set — using a random per-boot secret. Set it in production so sessions survive restarts.');
+  return crypto.randomBytes(32).toString('hex');
+})();
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'ehealthwatch-secret-key',
+  store: new SqliteSessionStore(db),
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: 'auto',
+  }
 }));
 
 // Helper: make session available in all templates
@@ -633,6 +660,12 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
   // Store form inputs in session for use after payment verification
   req.session.pendingForecast = { profileId: profile.id, Txt_age, cmbperiods, Txt_amh };
 
+  const razorpay = getRazorpay();
+  if (!razorpay) {
+    console.error('[Razorpay] RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not configured');
+    return res.render('forecast-gated', { profile, error: 'Payments are not configured on this server. Please contact support.', razorpayOrder: null, razorpayKeyId: null });
+  }
+
   try {
     const consumer = db.prepare('SELECT email, full_name FROM consumers WHERE id = ?').get(req.session.consumerId);
     const receipt  = `ehw_${profile.id}_${Date.now()}`;
@@ -688,6 +721,11 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).render('payment-error', { message: 'Missing payment fields. Please try again.', profileId: profile.id });
+  }
+
+  if (!process.env.RAZORPAY_KEY_SECRET) {
+    console.error('[Razorpay verify] RAZORPAY_KEY_SECRET not configured');
+    return res.status(503).render('payment-error', { message: 'Payments are not configured on this server. Please contact support.', profileId: profile.id });
   }
 
   // Verify HMAC signature using timing-safe comparison
