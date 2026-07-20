@@ -6,7 +6,22 @@ const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
+const nodemailer = require('nodemailer');
 const db = require('./db');
+
+// ─── Email transporter ────────────────────────────────────────────────────────
+// Lazily created so missing secrets don't crash startup; only contact form
+// submissions attempt to send, and failures are caught and logged.
+function createMailTransporter() {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) return null;
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+}
 
 const razorpay = new Razorpay({
   key_id:     process.env.RAZORPAY_KEY_ID,
@@ -146,10 +161,44 @@ app.get(['/', '/index.asp'], (req, res) => {
 });
 
 // Home – POST (contact form)
-app.post(['/', '/index.asp'], (req, res) => {
-  // Basic server-side handling — log and confirm
+app.post(['/', '/index.asp'], async (req, res) => {
   const { fname, lname, email, phone, comment } = req.body;
   console.log('[Contact Form]', { fname, lname, email, phone, comment });
+
+  // Attempt to email the submission to the site owner.
+  // Always show success to the visitor — a send failure must never break the page.
+  try {
+    const transporter = createMailTransporter();
+    if (transporter) {
+      const ownerEmail = process.env.GMAIL_USER;
+      const senderName = [fname, lname].filter(Boolean).join(' ') || 'A visitor';
+      await transporter.sendMail({
+        from:     `"e-healthwatch Contact Form" <${ownerEmail}>`,
+        to:       ownerEmail,
+        replyTo:  email || ownerEmail,
+        subject:  `New enquiry from ${senderName} — e-healthwatch`,
+        text: [
+          `You have received a new contact form submission on e-healthwatch.`,
+          ``,
+          `Name:    ${senderName}`,
+          `Email:   ${email || '(not provided)'}`,
+          `Phone:   ${phone || '(not provided)'}`,
+          ``,
+          `Message:`,
+          comment || '(no message)',
+          ``,
+          `---`,
+          `Reply directly to this email to respond to the sender.`,
+        ].join('\n'),
+      });
+      console.log('[Contact Form] Email sent to', ownerEmail);
+    } else {
+      console.warn('[Contact Form] GMAIL_USER or GMAIL_APP_PASSWORD not set — email not sent');
+    }
+  } catch (err) {
+    console.error('[Contact Form] Failed to send email:', err.message);
+  }
+
   res.render('index', { contactSuccess: true });
 });
 
