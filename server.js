@@ -1142,6 +1142,35 @@ app.get('/my-result/:profileId', requireConsumer, (req, res) => {
   res.render('my-result', { profile, input: JSON.parse(row.input_json), result: JSON.parse(row.result_json), createdAt: row.created_at });
 });
 
+// Printable / PDF-ready report for a stored forecast result
+app.get('/forecast-report/:profileId', requireConsumer, (req, res) => {
+  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+  if (!profile) return res.redirect('/dashboard');
+  const paidOrder = db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
+  if (!paidOrder) return res.redirect('/profile/' + profile.id);
+  const row = db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
+  if (!row) return res.redirect('/profile/' + profile.id);
+
+  const input  = JSON.parse(row.input_json);
+  const result = JSON.parse(row.result_json);
+  const yearsToOnset = result.forecastAge - parseInt(input.age, 10);
+  const interpNote =
+    yearsToOnset > 15 ? `Based on the AMH level of ${input.amh} ng/mL, ovarian reserve appears well-preserved, with an estimated ${yearsToOnset} years before natural menopause onset — well within the expected range for the current age.` :
+    yearsToOnset > 8  ? `The AMH level of ${input.amh} ng/mL suggests a typical ovarian reserve for this age. The estimated timeline of ${yearsToOnset} years to menopause is within the normal range.` :
+                        `The AMH level of ${input.amh} ng/mL suggests ovarian reserve may be lower than average for this age. We recommend discussing this result with a gynaecologist for a full clinical assessment.`;
+
+  const dateFmt = { day: 'numeric', month: 'long', year: 'numeric' };
+  res.render('forecast-report', {
+    profile,
+    input,
+    result,
+    yearsToOnset,
+    interpNote,
+    printDate: new Date().toLocaleDateString('en-IN', dateFmt),
+    testDate:  new Date(row.created_at).toLocaleDateString('en-IN', dateFmt),
+  });
+});
+
 // ─── Menopause Forecasting (legacy public form) ───────────────────────────────
 
 // Menopause Forecasting – GET (gate landing)
