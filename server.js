@@ -297,6 +297,48 @@ app.post(['/', '/index.asp'], async (req, res) => {
   res.render('index', { contactSuccess: true });
 });
 
+// ─── Account emails (verification / password reset) ─────────────────────────
+
+function appBaseUrl(req) {
+  return process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+// Generates and stores a fresh token, then emails the verification link.
+// Without email configuration the link is logged so a developer/operator can
+// still complete the flow manually; the account works fine unverified.
+async function sendVerificationEmail(req, consumer) {
+  const token   = crypto.randomBytes(24).toString('hex');
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  db.prepare('UPDATE consumers SET verification_token = ?, verification_token_expires = ? WHERE id = ?')
+    .run(token, expires, consumer.id);
+
+  const link = `${appBaseUrl(req)}/verify-email?token=${token}`;
+  const transporter = createMailTransporter();
+  if (!transporter) {
+    console.warn('[verify-email] Email not configured — verification link for', consumer.email, 'is:', link);
+    return;
+  }
+  try {
+    await transporter.sendMail({
+      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      to:      consumer.email,
+      subject: 'Verify your email — e-healthwatch',
+      text: [
+        `Hello${consumer.full_name ? ' ' + consumer.full_name : ''},`,
+        ``,
+        `Please confirm your email address for your e-healthwatch account by opening this link:`,
+        ``,
+        link,
+        ``,
+        `The link is valid for 24 hours. If you did not create this account, you can ignore this email.`,
+      ].join('\n'),
+    });
+    console.log('[verify-email] Verification email sent to', consumer.email);
+  } catch (err) {
+    console.error('[verify-email] Failed to send:', err.message);
+  }
+}
+
 // Static content pages
 app.get('/health.asp', (req, res) => res.render('health'));
 app.get('/menopause.asp', (req, res) => res.render('menopause'));
@@ -658,6 +700,7 @@ app.post('/signup', async (req, res) => {
     const r = db.prepare('INSERT INTO consumers (email, password_hash, full_name, consent_given_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null);
     req.session.consumerId   = r.lastInsertRowid;
     req.session.consumerName = full_name || email.split('@')[0];
+    await sendVerificationEmail(req, { id: r.lastInsertRowid, email, full_name });
     res.redirect('/dashboard');
   } catch (err) {
     console.error('[signup error]', err);
@@ -690,6 +733,34 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// Email verification — link target from the verification email
+app.get('/verify-email', (req, res) => {
+  const token = String(req.query.token || '');
+  let status = 'invalid';
+  if (token) {
+    const row = db.prepare('SELECT id, verification_token_expires FROM consumers WHERE verification_token = ?').get(token);
+    if (row) {
+      if (row.verification_token_expires && row.verification_token_expires < new Date().toISOString()) {
+        status = 'expired';
+      } else {
+        db.prepare('UPDATE consumers SET email_verified = 1, verification_token = NULL, verification_token_expires = NULL WHERE id = ?').run(row.id);
+        status = 'success';
+      }
+    }
+  }
+  res.render('verify-email', { status });
+});
+
+// Resend verification email (from the dashboard banner)
+app.post('/resend-verification', requireConsumer, async (req, res) => {
+  if (rateLimited('resend-verify:' + req.ip)) return res.redirect('/dashboard');
+  const consumer = db.prepare('SELECT id, email, full_name, email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
+  if (consumer && !consumer.email_verified) {
+    await sendVerificationEmail(req, consumer);
+  }
+  res.redirect('/dashboard?verifySent=1');
+});
+
 // Consumer logout
 app.get('/consumer-logout', (req, res) => {
   req.session.consumerId   = null;
@@ -704,7 +775,13 @@ app.get('/dashboard', requireConsumer, (req, res) => {
     const paid = db.prepare('SELECT id FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(p.id, 'paid');
     return { ...p, hasPaidResult: !!paid };
   });
-  res.render('dashboard', { profiles: profilesWithStatus, consumerName: req.session.consumerName });
+  const consumer = db.prepare('SELECT email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
+  res.render('dashboard', {
+    profiles: profilesWithStatus,
+    consumerName: req.session.consumerName,
+    emailVerified: !!(consumer && consumer.email_verified),
+    verifySent: req.query.verifySent === '1',
+  });
 });
 
 // New profile

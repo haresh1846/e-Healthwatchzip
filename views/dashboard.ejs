@@ -18,6 +18,25 @@
 
   <div class="dash-body">
 
+    <% if (!emailVerified) { %>
+    <div style="margin-bottom:22px;padding:14px 18px;background:#fdf6e7;border:1px solid #eddcb3;border-radius:12px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;">
+      <span style="font-size:20px;">&#9993;&#65039;</span>
+      <span style="flex:1;min-width:200px;font-size:14px;color:#6b5d3f;">
+        <% if (verifySent) { %>
+          Verification email sent — check your inbox and open the link inside.
+        <% } else { %>
+          Please verify your email address — we sent you a link when you signed up.
+        <% } %>
+      </span>
+      <% if (!verifySent) { %>
+      <form method="post" action="/resend-verification" style="margin:0;">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+        <button type="submit" style="background:none;border:1px solid #cbb26a;border-radius:8px;padding:6px 14px;font-size:13px;color:#6b5d3f;cursor:pointer;">Resend verification email</button>
+      </form>
+      <% } %>
+    </div>
+    <% } %>
+
     <!-- What is this -->
     <div class="dash-intro">
       <h2>Your Health Profiles</h2>

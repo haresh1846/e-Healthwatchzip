@@ -1,0 +1,26 @@
+<%- include('partials/header', { pageTitle: 'Email Verification — e-healthwatch' }) %>
+
+<div class="dash-bg">
+  <div class="dash-body" style="max-width:560px;margin:0 auto;padding-top:60px;padding-bottom:80px;">
+    <div class="dash-intro" style="text-align:center;">
+      <% if (status === 'success') { %>
+        <div style="font-size:44px;margin-bottom:12px;">&#9989;</div>
+        <h2>Email verified</h2>
+        <p>Thanks — your email address is confirmed.</p>
+        <a href="/dashboard" class="auth-submit" style="display:inline-flex;width:auto;margin-top:18px;">Go to my dashboard &rarr;</a>
+      <% } else if (status === 'expired') { %>
+        <div style="font-size:44px;margin-bottom:12px;">&#8987;</div>
+        <h2>Link expired</h2>
+        <p>This verification link has expired. Sign in and use the &ldquo;Resend verification email&rdquo; button on your dashboard to get a fresh one.</p>
+        <a href="/login" class="auth-submit" style="display:inline-flex;width:auto;margin-top:18px;">Sign in &rarr;</a>
+      <% } else { %>
+        <div style="font-size:44px;margin-bottom:12px;">&#10060;</div>
+        <h2>Invalid link</h2>
+        <p>This verification link is not valid. It may have already been used, or was copied incompletely.</p>
+        <a href="/login" class="auth-submit" style="display:inline-flex;width:auto;margin-top:18px;">Sign in &rarr;</a>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>
