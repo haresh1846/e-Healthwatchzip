@@ -1,0 +1,1 @@
+- [Warm Wellness design system](warm-wellness-design.md) — Bootstrap 3 replaced with custom CSS; better-sqlite3 must be rebuilt after Node version changes.

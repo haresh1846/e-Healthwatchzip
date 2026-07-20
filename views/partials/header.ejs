@@ -2,59 +2,108 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <META NAME="ROBOTS" CONTENT="INDEX, FOLLOW">
-  <meta name="description" content="AMH,PCOS,Menopause">
-  <title>e-healthwatch</title>
-  <!-- Bootstrap 3 from CDN -->
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- SEO -->
+  <title><%= locals.pageTitle || 'e-healthwatch — Predictive Women\'s Health Analytics' %></title>
+  <meta name="description" content="<%= locals.pageDesc || 'Evidence-based predictive health insights for women. Menopause forecasting with AMH, BMD calculator, gynaecology and pregnancy guides.' %>">
+  <meta name="keywords" content="menopause forecast, AMH, BMD calculator, women health, bone mineral density, PCOS, gynaecology, predictive health">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="e-healthwatch">
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<%= locals.pageTitle || 'e-healthwatch — Predictive Women\'s Health Analytics' %>">
+  <meta property="og:description" content="<%= locals.pageDesc || 'Evidence-based predictive health insights for women using advanced mathematical modelling.' %>">
+  <meta property="og:image" content="/images/warm-hero.jpg">
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<%= locals.pageTitle || 'e-healthwatch' %>">
+  <meta name="twitter:description" content="<%= locals.pageDesc || 'Predictive women\'s health analytics — menopause forecasting, BMD calculator and more.' %>">
+  <!-- Canonical -->
+  <link rel="canonical" href="https://e-healthwatch.com<%= locals.canonical || '/' %>">
+  <!-- Fonts (non-blocking) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" media="print" onload="this.media='all'"
+    href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Nunito:wght@300;400;500;600;700;800&display=swap">
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Nunito:wght@400;600;700&display=swap">
+  </noscript>
+  <!-- Styles -->
   <link rel="stylesheet" href="/css/custom.css">
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MedicalOrganization",
+    "name": "e-healthwatch",
+    "description": "Predictive health information for women using mathematical modelling",
+    "url": "https://e-healthwatch.com",
+    "medicalSpecialty": ["Gynecology", "Women's Health", "Bone Density"],
+    "availableService": [
+      {"@type": "MedicalTest", "name": "Menopause Forecasting Calculator"},
+      {"@type": "MedicalTest", "name": "Bone Mineral Density (BMD) Calculator"}
+    ]
+  }
+  </script>
 </head>
 <body>
-<header>
-  <div class="container-fluid">
-    <div class="row">
-      <div class="black-top">
-        <div class="container">
-          <div class="pull-right">
-            <div class="help-line"></div>
-          </div>
-        </div>
+
+<!-- Navbar -->
+<nav class="ehw-nav">
+  <div class="ehw-nav__inner">
+    <a href="/" class="ehw-nav__logo" aria-label="e-healthwatch home">
+      <div class="ehw-nav__logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
       </div>
+      <span class="ehw-nav__logo-text">e-health<span>watch</span></span>
+    </a>
+
+    <div class="ehw-nav__links">
+      <a href="/" class="ehw-nav__link">Home</a>
+      <a href="/gynaecology.asp" class="ehw-nav__link">Gynaecology</a>
+      <a href="/pregnancy.asp" class="ehw-nav__link">Pregnancy</a>
+      <a href="/forecasting.asp" class="ehw-nav__link">Forecast Menopause</a>
+      <a href="/contact.asp" class="ehw-nav__link">Contact Us</a>
+      <% if (locals.userid && locals.userid !== '') { %>
+        <a href="/logout.asp" class="ehw-nav__cta">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Logout
+        </a>
+      <% } else { %>
+        <a href="/bmdlogin.asp" class="ehw-nav__cta">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          BMD Login
+        </a>
+      <% } %>
     </div>
+
+    <button class="ehw-nav__hamburger" onclick="toggleNav()" aria-label="Toggle menu">
+      <svg id="nav-icon-menu" xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <svg id="nav-icon-close" style="display:none" xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
 
-  <!-- Nav Bar -->
-  <div class="container-fluid">
-    <div class="row">
-      <nav class="navbar navbar-default navbar-static-top">
-        <div class="container">
-          <div class="navbar-header">
-            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
-              <span class="sr-only">Toggle navigation</span>
-              <span class="icon-bar"></span>
-              <span class="icon-bar"></span>
-              <span class="icon-bar"></span>
-            </button>
-            <a class="navbar-brand" href="/"><img alt="e-healthwatch" class="img-responsive" src="/images/logo.png" id="top" style="display:inline-block; max-height:50px;"/></a>
-          </div>
-          <div id="navbar" class="navbar-collapse collapse">
-            <ul class="nav navbar-nav pull-right">
-              <li><a href="/">Home</a></li>
-              <li><a href="/gynaecology.asp">Gynaecology</a></li>
-              <li><a href="/pregnancy.asp">Pregnancy</a></li>
-              <li><a href="/forecasting.asp">Forecast Menopause</a></li>
-              <% if (locals.userid && locals.userid !== '') { %>
-                <li><a href="/logout.asp">Logout</a></li>
-              <% } else { %>
-                <li><a href="/bmdlogin.asp">BMD Calculator</a></li>
-              <% } %>
-              <li><a href="/contact.asp">Contact Us</a></li>
-            </ul>
-          </div>
-        </div>
-      </nav>
-    </div>
+  <div class="ehw-nav__mobile" id="ehw-mobile-nav">
+    <a href="/">Home</a>
+    <a href="/gynaecology.asp">Gynaecology</a>
+    <a href="/pregnancy.asp">Pregnancy</a>
+    <a href="/forecasting.asp">Forecast Menopause</a>
+    <a href="/contact.asp">Contact Us</a>
+    <% if (locals.userid && locals.userid !== '') { %>
+      <a href="/logout.asp" class="ehw-nav__mobile-cta">Logout</a>
+    <% } else { %>
+      <a href="/bmdlogin.asp" class="ehw-nav__mobile-cta">BMD Calculator Login</a>
+    <% } %>
   </div>
-</header>
+</nav>
+
+<script>
+function toggleNav() {
+  var m = document.getElementById('ehw-mobile-nav');
+  var mi = document.getElementById('nav-icon-menu');
+  var ci = document.getElementById('nav-icon-close');
+  m.classList.toggle('open');
+  mi.style.display = m.classList.contains('open') ? 'none' : '';
+  ci.style.display = m.classList.contains('open') ? ''     : 'none';
+}
+</script>

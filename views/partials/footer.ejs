@@ -1,12 +1,57 @@
-<footer>
-  <div class="container">
-    <div class="row">
-      &copy; All rights reserved
+<!-- Footer -->
+<footer class="ehw-footer">
+  <div class="ehw-footer__glow"></div>
+  <div class="ehw-footer__inner">
+    <div class="ehw-footer__grid">
+      <!-- Brand -->
+      <div>
+        <div class="ehw-footer__logo">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#f87171"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span class="ehw-footer__logo-text">e-health<span>watch</span></span>
+        </div>
+        <p class="ehw-footer__tag">Predictive health information using sophisticated mathematical modelling. Empowering women with personalised data insights.</p>
+      </div>
+      <!-- Platform -->
+      <div class="ehw-footer__col">
+        <h4>Platform</h4>
+        <ul>
+          <li><a href="/forecasting.asp">Menopause Forecast</a></li>
+          <li><a href="/bmdlogin.asp">BMD Calculator</a></li>
+          <li><a href="/gynaecology.asp">Gynaecology</a></li>
+          <li><a href="/pregnancy.asp">Pregnancy</a></li>
+          <li><a href="/organ.asp">About Disease</a></li>
+        </ul>
+      </div>
+      <!-- Company -->
+      <div class="ehw-footer__col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="/health.asp">About Health</a></li>
+          <li><a href="/menopause.asp">Menopause</a></li>
+          <li><a href="/data.asp">Data Modelling</a></li>
+          <li><a href="/contact.asp">Contact Us</a></li>
+        </ul>
+      </div>
+      <!-- Newsletter -->
+      <div>
+        <h4 style="font-family:var(--font-serif);color:white;font-size:17px;margin-bottom:18px;">Stay Updated</h4>
+        <p class="ehw-footer__news p">Join our newsletter for the latest updates in women's health modelling.</p>
+        <div class="ehw-footer__news-form">
+          <input type="email" class="ehw-footer__news-input" placeholder="Your email">
+          <button class="ehw-footer__news-btn" aria-label="Subscribe">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ehw-footer__bottom">
+      <p>&copy; <%= new Date().getFullYear() %> e-healthwatch. All rights reserved.</p>
+      <p>Designed with warmth &amp; precision.</p>
     </div>
   </div>
 </footer>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 </body>
 </html>

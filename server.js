@@ -35,9 +35,17 @@ app.use((req, res, next) => {
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
-// Home
+// Home – GET
 app.get(['/', '/index.asp'], (req, res) => {
-  res.render('index');
+  res.render('index', { contactSuccess: false });
+});
+
+// Home – POST (contact form)
+app.post(['/', '/index.asp'], (req, res) => {
+  // Basic server-side handling — log and confirm
+  const { fname, lname, email, phone, comment } = req.body;
+  console.log('[Contact Form]', { fname, lname, email, phone, comment });
+  res.render('index', { contactSuccess: true });
 });
 
 // Static content pages

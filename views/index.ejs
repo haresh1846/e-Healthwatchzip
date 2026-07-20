@@ -1,125 +1,437 @@
 <%- include('partials/header') %>
 
-<script>
-function redir() {
-  document.frm_pickup.method = "post";
-  document.frm_pickup.action = "/";
-  document.frm_pickup.submit();
-}
-</script>
+<!-- ═══════════════════════════════════════════════════════════
+     HERO SECTION
+════════════════════════════════════════════════════════════════ -->
+<section class="ehw-hero">
+  <div class="ehw-hero__blob ehw-hero__blob--1"></div>
+  <div class="ehw-hero__blob ehw-hero__blob--2"></div>
+  <div class="ehw-hero__blob ehw-hero__blob--3"></div>
 
-<!------ Carousel ------->
-<div class="container-fluid">
-  <div class="row">
-    <div id="myCarousel" class="carousel slide" data-ride="carousel">
-      <div class="carousel-inner" role="listbox">
-        <div class="item active">
-          <div class="banner-placeholder" style="background:#2c7bb6;color:#fff;text-align:center;padding:80px 20px;">
-            <h2>e-healthwatch</h2>
-            <p>AMH · PCOS · Menopause</p>
+  <div class="ehw-hero__inner">
+    <!-- Text -->
+    <div>
+      <div class="ehw-hero__badge">
+        <span class="ehw-hero__badge-dot"></span>
+        Trusted Women's Health Platform
+      </div>
+      <h1>
+        Predictive health insights with
+        <span class="grad">warmth &amp; precision.</span>
+      </h1>
+      <p class="ehw-hero__desc">
+        Empowering women through advanced mathematical modelling.
+        Because understanding your health journey shouldn't feel clinical—it should feel deeply personal.
+      </p>
+      <div class="ehw-hero__btns">
+        <a href="/forecasting.asp" class="ehw-hero__btn-p">
+          Forecast Menopause
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="/bmdlogin.asp" class="ehw-hero__btn-s">BMD Calculator</a>
+      </div>
+      <div class="ehw-hero__social">
+        <div class="ehw-hero__avatars">
+          <div class="ehw-hero__avatar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="ehw-hero__avatar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="ehw-hero__avatar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
         </div>
-        <div class="item">
-          <div class="banner-placeholder" style="background:#1a5a8a;color:#fff;text-align:center;padding:80px 20px;">
-            <h2>BMD Calculator</h2>
-            <p>Bone Mineral Density Assessment</p>
-          </div>
+        <p>Join 12,000+ women taking control of their health today</p>
+      </div>
+    </div>
+
+    <!-- Image + Deal -->
+    <div class="ehw-hero__img-wrap">
+      <img src="/images/warm-hero.jpg" alt="Warm wellness illustration for women's health" class="ehw-hero__img">
+      <div class="ehw-hero__deal">
+        <div class="ehw-hero__deal-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L9.27 9l-6.27.73 4.5 4.27-1.09 6.27L12 17l5.59 3.27-1.09-6.27 4.5-4.27-6.27-.73z"/></svg>
         </div>
-        <div class="item">
-          <div class="banner-placeholder" style="background:#3a8fc1;color:#fff;text-align:center;padding:80px 20px;">
-            <h2>Menopause Forecasting</h2>
-            <p>Predict menopause onset using AMH values</p>
-          </div>
-        </div>
-        <div class="item">
-          <div class="banner-placeholder" style="background:#0e4a7a;color:#fff;text-align:center;padding:80px 20px;">
-            <h2>Women's Health</h2>
-            <p>Gynaecology · Pregnancy · Forecasting</p>
+        <div>
+          <p class="ehw-hero__deal-label">Limited Offer</p>
+          <div class="ehw-hero__deal-price">
+            <strong>&#8377;49</strong>
+            <del>&#8377;199</del>
           </div>
         </div>
       </div>
-      <a class="left carousel-control" href="#myCarousel" role="button" data-slide="prev">
-        <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
-        <span class="sr-only">Previous</span>
+    </div>
+  </div>
+
+  <!-- Wave divider -->
+  <div class="ehw-wave">
+    <svg data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V95.8C59.71,118.08,130.83,111.47,196.59,101.4,239.5,94.9,282.7,80.8,321.39,56.44Z" class="sf"></path>
+    </svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     SOCIAL PROOF STRIP
+════════════════════════════════════════════════════════════════ -->
+<section class="ehw-strip">
+  <div class="ehw-strip__inner">
+    <div class="ehw-strip__item">
+      <div class="ehw-strip__avatars">
+        <div class="ehw-strip__avatar" style="background:var(--rose-200)"></div>
+        <div class="ehw-strip__avatar" style="background:var(--amber-200)"></div>
+        <div class="ehw-strip__avatar" style="background:var(--green-200)"></div>
+        <div class="ehw-strip__avatar" style="background:var(--purple-200)"></div>
+      </div>
+      <span>12,000+ women <span style="color:var(--rose)">already using it</span></span>
+    </div>
+    <div class="ehw-strip__divider"></div>
+    <div class="ehw-strip__item">
+      <div class="ehw-strip__stars">
+        &#9733;&#9733;&#9733;&#9733;&#9733;
+      </div>
+      <span>4.9 / 5 <span style="color:var(--stone-400);font-weight:400">from users</span></span>
+    </div>
+    <div class="ehw-strip__divider"></div>
+    <div class="ehw-strip__item">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--green-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+      <span>100% Private &amp; Secure</span>
+    </div>
+    <div class="ehw-strip__divider"></div>
+    <div class="ehw-strip__item">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span>Special Offer: <span class="ehw-strip__price">&#8377;49</span> <span class="ehw-strip__orig">&#8377;199</span></span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     INFORMATION CARDS
+════════════════════════════════════════════════════════════════ -->
+<section class="ehw-sec ehw-sec--cream">
+  <div class="ehw-sec__inner">
+    <div class="ehw-sec__head">
+      <h2>Comprehensive Understanding</h2>
+      <p>We bridge the gap between complex medical data and actionable, personal health insights.</p>
+    </div>
+    <div class="ehw-cards">
+      <!-- General Health -->
+      <a href="/health.asp" class="ehw-card ehw-card--rose" style="text-decoration:none">
+        <div class="ehw-card__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <h3>General Health</h3>
+        <p>Evidence-based insights into women's daily health and wellbeing.</p>
+        <span class="ehw-card__link">Learn more <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
       </a>
-      <a class="right carousel-control" href="#myCarousel" role="button" data-slide="next">
-        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
-        <span class="sr-only">Next</span>
+      <!-- Menopause -->
+      <a href="/menopause.asp" class="ehw-card ehw-card--amber" style="text-decoration:none">
+        <div class="ehw-card__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <h3>Menopause</h3>
+        <p>Forecast your timeline with AMH-based predictive algorithms.</p>
+        <span class="ehw-card__link">Learn more <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
+      <!-- Data Modelling -->
+      <a href="/data.asp" class="ehw-card ehw-card--green" style="text-decoration:none">
+        <div class="ehw-card__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h3>Data Modelling</h3>
+        <p>Sophisticated mathematical models translating raw data to insights.</p>
+        <span class="ehw-card__link">Learn more <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </a>
+      <!-- About Disease -->
+      <a href="/organ.asp" class="ehw-card ehw-card--purple" style="text-decoration:none">
+        <div class="ehw-card__icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        </div>
+        <h3>About Disease</h3>
+        <p>Comprehensive library of gynaecological conditions and markers.</p>
+        <span class="ehw-card__link">Learn more <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
       </a>
     </div>
   </div>
-</div>
+</section>
 
-<!------ Below Carousel ------->
-<div class="below-carousel">
-  <div class="container">
-    <div class="row">
-      <div class="text-center"></div>
+<!-- ═══════════════════════════════════════════════════════════
+     HOW IT WORKS
+════════════════════════════════════════════════════════════════ -->
+<section class="ehw-sec ehw-sec--white" style="position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:radial-gradient(ellipse at top right, rgba(251,207,232,0.18), transparent 60%);pointer-events:none"></div>
+  <div class="ehw-sec__inner" style="position:relative;z-index:1">
+    <div class="ehw-sec__head">
+      <p class="ehw-sec__label">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Simple to use
+      </p>
+      <h2>Your health journey in 3 steps</h2>
+      <p>No jargon, no barriers. Just clear, personalised health insights at your fingertips.</p>
     </div>
-  </div>
-</div>
-
-<!------ Services ------->
-<section id="cat-bg">
-  <div class="container">
-    <div class="row">
-      <div class="col-md-8 col-xs-12">
-        <div class="col-md-5 col-sm-6 col-xs-6 category border-bottom">
-          <h2> About your health </h2>
-          <p>Health may be defined as a "complete/balanced condition" in which there is synchronization between body and mind. Cells are the fundamental units of the body. Cells with similar functions are grouped to form tissues like epithelial, connective, muscular and nervous tissues. <br/>
-          <br><a href="/health.asp">Read more... </a></p>
+    <div class="ehw-steps">
+      <div class="ehw-step">
+        <div class="ehw-step__icon ehw-step__icon--rose">
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
         </div>
-        <div class="col-md-5 col-sm-6 col-xs-6 category border-bottom border-left">
-          <h2> Menopause </h2>
-          <p>Why to predict menopause?<br><br>
-          The cessation of reproductive life span in the women is called menopause and prediction of menopause will help to plan for reproductive potentiality in infertility treatment and planning for premenopausal and post-menopausal related health effects.
-          <a href="/menopause.asp">Read more... </a></p>
-        </div>
-        <div class="col-md-5 col-sm-6 col-xs-6 category ">
-          <h2> About modelling of data </h2>
-          <p>In the present day, multiple diagnoses tests involves exorbitant cost and are not affordable for everyone. <br/>
-          <a href="/data.asp">Read more... </a></p>
-        </div>
-        <div class="col-md-5 col-sm-6 col-xs-6 category  border-left">
-          <h2> About disease  </h2>
-          <p>The manifestation of a disease initially may be detected at body level or at organ level.<br/>
-          <a href="/organ.asp">Read more... </a></p>
-        </div>
+        <span class="ehw-step__num">01</span>
+        <h3>Explore Your Topics</h3>
+        <p>Browse gynaecology, menopause, pregnancy, and bone health guides — all evidence-based and written in plain language.</p>
       </div>
-      <div class="col-md-4 form-heading">
-        <h1>Send us a Message</h1>
-        <form role="form" name="frm_pickup" method="post" action="/">
-          <input type="hidden" name="validate1" value="T">
-          <div class="form-group">
-            <input type="text" class="form-control" name="name" placeholder="Your Name">
-          </div>
-          <div class="form-group">
-            <input type="email" class="form-control" name="email" placeholder=" Your Email address">
-          </div>
-          <div class="form-group">
-            <input type="text" class="form-control" name="phone" placeholder="phone number">
-          </div>
-          <div class="form-group">
-            <textarea class="form-control" rows="5" name="comment" placeholder="Message"></textarea>
-          </div>
-          <button type="submit" class="btn btn-default pull-left form-submit">Submit</button>
-        </form>
+      <div class="ehw-step">
+        <div class="ehw-step__icon ehw-step__icon--amber">
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <span class="ehw-step__num">02</span>
+        <h3>Run a Prediction</h3>
+        <p>Enter your AMH level or BMD data into our calculators and get an instant, personalised forecast in seconds.</p>
+      </div>
+      <div class="ehw-step">
+        <div class="ehw-step__icon ehw-step__icon--green">
+          <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <span class="ehw-step__num">03</span>
+        <h3>Understand Your Results</h3>
+        <p>Receive clear insights and guidance with recommended next steps tailored specifically to you.</p>
       </div>
     </div>
-  </div>
-</div>
-
-<!------ FOOTER ------->
-<footer>
-  <div class="container">
-    <div class="row">
-      &copy; All rights reserved<br>
+    <div class="ehw-steps__ctas">
+      <a href="/forecasting.asp" class="ehw-steps__btn-p">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Get Started at &#8377;49
+      </a>
+      <span class="ehw-steps__btn-s" style="cursor:default">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Takes less than 2 minutes
+      </span>
     </div>
-    Visitor counter not available.
   </div>
-</footer>
+</section>
 
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-</body>
-</html>
+<!-- ═══════════════════════════════════════════════════════════
+     BMD FEATURE
+════════════════════════════════════════════════════════════════ -->
+<section class="ehw-sec ehw-sec--cream">
+  <div class="ehw-sec__inner">
+    <div class="ehw-bmd-wrap">
+      <div>
+        <h2>Bone Mineral Density Calculator</h2>
+        <p class="ehw-bmd__desc">Log in to securely access our advanced BMD calculator. Track your bone health trajectory over time and receive personalised insights based on your specific medical profile.</p>
+        <ul class="ehw-bmd__list">
+          <li>
+            <span class="ehw-bmd__list-dot">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </span>
+            Track historical BMD data
+          </li>
+          <li>
+            <span class="ehw-bmd__list-dot">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </span>
+            Compare with age-matched averages
+          </li>
+          <li>
+            <span class="ehw-bmd__list-dot">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </span>
+            Secure and private analysis
+          </li>
+        </ul>
+        <a href="/bmdlogin.asp" class="ehw-bmd__btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Login to Access Calculator
+        </a>
+      </div>
+      <!-- Mock chart -->
+      <div class="ehw-bmd__chart">
+        <div class="ehw-bmd__chart-bar">
+          <div class="ehw-bmd__chart-dot"></div>
+          <div class="ehw-bmd__chart-dot"></div>
+          <div class="ehw-bmd__chart-dot"></div>
+        </div>
+        <div class="ehw-bmd__chart-area">
+          <svg style="position:absolute;bottom:0;width:100%;height:66%" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#E11D48" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#E11D48" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <path d="M0,100 L0,50 Q25,20 50,60 T100,30 L100,100 Z" fill="url(#gradR)" opacity="0.5"/>
+            <path d="M0,50 Q25,20 50,60 T100,30" fill="none" stroke="#E11D48" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     PRICING SECTION
+════════════════════════════════════════════════════════════════ -->
+<section class="ehw-sec ehw-sec--cream">
+  <div class="ehw-sec__inner">
+    <div style="text-align:center;margin-bottom:48px">
+      <span style="display:inline-block;background:var(--rose-100);color:var(--rose);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;padding:8px 18px;border-radius:9999px;margin-bottom:14px">Limited Time Offer</span>
+      <h2 style="font-size:clamp(26px,4vw,38px);margin-bottom:12px">Simple, honest pricing</h2>
+      <p style="font-size:17px;color:var(--stone)">Full access to predictive health tools — at a price that respects you.</p>
+    </div>
+    <div class="ehw-pricing-grid">
+      <!-- Offer Card -->
+      <div class="ehw-pricing__card">
+        <div class="ehw-pricing__glow ehw-pricing__glow--1"></div>
+        <div class="ehw-pricing__glow ehw-pricing__glow--2"></div>
+        <div class="ehw-pricing__inner">
+          <div class="ehw-pricing__tag">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L9.27 9l-6.27.73 4.5 4.27-1.09 6.27L12 17l5.59 3.27-1.09-6.27 4.5-4.27-6.27-.73z"/></svg>
+            Special Offer — Limited Time
+          </div>
+          <div class="ehw-pricing__price-row">
+            <span class="ehw-pricing__amount">&#8377;49</span>
+            <div class="ehw-pricing__orig">
+              <del>&#8377;199</del>
+              <span>75% off</span>
+            </div>
+          </div>
+          <p class="ehw-pricing__sub">One-time access &middot; No subscription</p>
+          <ul class="ehw-pricing__features">
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Menopause Forecasting Calculator
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Bone Mineral Density (BMD) Calculator
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Full Gynaecology &amp; Pregnancy Guides
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Personalised health insights
+            </li>
+            <li>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              Private &amp; secure results
+            </li>
+          </ul>
+          <button class="ehw-pricing__buy" onclick="window.location='/bmdlogin.asp'">Get Full Access — &#8377;49</button>
+          <p class="ehw-pricing__note">Secure payment &middot; Instant access</p>
+        </div>
+      </div>
+      <!-- Value Props -->
+      <div class="ehw-pricing__values">
+        <h3>Why &#8377;49 is worth every rupee</h3>
+        <div class="ehw-value-item">
+          <div class="ehw-value-icon ehw-value-icon--green">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+          </div>
+          <div>
+            <h4>Clinically grounded models</h4>
+            <p>Our AMH-based menopause forecasting and BMD algorithms are built on peer-reviewed research.</p>
+          </div>
+        </div>
+        <div class="ehw-value-item">
+          <div class="ehw-value-icon ehw-value-icon--amber">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          </div>
+          <div>
+            <h4>Results in under 2 minutes</h4>
+            <p>Enter your data, get a personalised prediction instantly — no waiting, no appointments.</p>
+          </div>
+        </div>
+        <div class="ehw-value-item">
+          <div class="ehw-value-icon ehw-value-icon--rose">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div>
+            <h4>Trusted by 12,000+ women</h4>
+            <p>Women across India use e-healthwatch to understand their health journey on their own terms.</p>
+          </div>
+        </div>
+        <div class="ehw-value-item">
+          <div class="ehw-value-icon ehw-value-icon--purple">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </div>
+          <div>
+            <h4>4.9 / 5 user satisfaction</h4>
+            <p>Users consistently rate us highly for clarity, accuracy, and ease of use.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CONTACT SECTION
+════════════════════════════════════════════════════════════════ -->
+<section class="ehw-sec ehw-sec--cream">
+  <div class="ehw-sec__inner">
+    <div class="ehw-sec__head">
+      <h2>Let's start a conversation</h2>
+      <p>Have questions about our predictive models or need support? We're here for you.</p>
+    </div>
+    <div class="ehw-contact__card">
+      <!-- Info -->
+      <div class="ehw-contact__info">
+        <h3>Contact Info</h3>
+        <div class="ehw-contact__info-item">
+          <div class="ehw-contact__info-ico">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          </div>
+          <div>
+            <p class="ehw-contact__info-label">Email us</p>
+            <p class="ehw-contact__info-value">hello@e-healthwatch.com</p>
+          </div>
+        </div>
+        <div class="ehw-contact__info-item">
+          <div class="ehw-contact__info-ico">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.62 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </div>
+          <div>
+            <p class="ehw-contact__info-label">Call us</p>
+            <p class="ehw-contact__info-value">+44 (0) 123 456 789</p>
+          </div>
+        </div>
+        <div class="ehw-contact__info-item">
+          <div class="ehw-contact__info-ico">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div>
+            <p class="ehw-contact__info-label">Location</p>
+            <p class="ehw-contact__info-value">Medical Research Park<br>London, UK</p>
+          </div>
+        </div>
+      </div>
+      <!-- Form -->
+      <form method="post" action="/">
+        <input type="hidden" name="validate1" value="T">
+        <div class="ehw-contact__row">
+          <div>
+            <label for="c-fname">First Name</label>
+            <input id="c-fname" type="text" name="fname" class="ehw-contact__input" placeholder="Jane">
+          </div>
+          <div>
+            <label for="c-lname">Last Name</label>
+            <input id="c-lname" type="text" name="lname" class="ehw-contact__input" placeholder="Doe">
+          </div>
+        </div>
+        <label for="c-email">Email Address</label>
+        <input id="c-email" type="email" name="email" class="ehw-contact__input" placeholder="jane@example.com">
+        <label for="c-phone">Phone</label>
+        <input id="c-phone" type="text" name="phone" class="ehw-contact__input" placeholder="+91 98765 43210">
+        <label for="c-msg">Message</label>
+        <textarea id="c-msg" name="comment" class="ehw-contact__input" placeholder="How can we help you?"></textarea>
+        <% if (locals.contactSuccess) { %>
+          <p style="color:var(--green-600);font-weight:700;margin-bottom:14px">&#10003; Message sent! We'll be in touch soon.</p>
+        <% } %>
+        <button type="submit" class="ehw-contact__submit">Send Message</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>
