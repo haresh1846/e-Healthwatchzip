@@ -829,13 +829,12 @@ app.get('/forecasting.asp', (req, res) => {
 });
 
 // Menopause Forecasting Result – POST
-// Kept for backward compatibility with BMD clinic workflow.
-// Unauthenticated consumer requests are redirected to the gate landing.
+// Kept for backward compatibility with BMD clinic workflow only.
+// Consumers must go through the paid /forecast/:profileId flow — allowing a
+// consumer session here would let them compute the forecast without paying.
 app.post('/mpresult.asp', (req, res) => {
-  // Require either a BMD clinic session or a consumer session.
-  // This prevents unauthenticated users from bypassing the gate by POSTing directly.
-  if (!req.session.userid && !req.session.consumerId) {
-    return res.redirect('/forecasting.asp');
+  if (!req.session.userid) {
+    return res.redirect(req.session.consumerId ? '/dashboard' : '/forecasting.asp');
   }
 
   const { Txt_name, Txt_age, cmbperiods, Txt_amh } = req.body;
