@@ -13,7 +13,7 @@
     </div>
   </section>
 
-  <div class="dash-body" style="max-width:760px;">
+  <div class="dash-body" style="max-width:900px;">
 
     <!-- Profile context -->
     <div class="forecast-profile-bar">
@@ -24,68 +24,105 @@
       <span>Test for: <strong><%= profile.display_name %></strong> (<%= profile.relationship_label %>)</span>
     </div>
 
-    <!-- Payment summary -->
-    <div class="pay-summary-card">
-      <div class="pay-summary-left">
-        <div class="pay-summary-title">Menopause Forecast</div>
-        <div class="pay-summary-desc">Personal prediction based on AMH + age + cycle pattern</div>
-        <ul class="pay-summary-features">
-          <li>✓ Estimated age of menopause onset</li>
-          <li>✓ Personalised to <%= profile.display_name %>'s data</li>
-          <li>✓ Result stored — view anytime for free</li>
-          <li>✓ Medical disclaimer & interpretation guide included</li>
-        </ul>
+    <div class="fgated-layout">
+
+      <!-- ─── LEFT: Payment summary + Form ──────────────────────── -->
+      <div class="fgated-main">
+
+        <!-- Payment summary -->
+        <div class="pay-summary-card">
+          <div class="pay-summary-left">
+            <div class="pay-summary-title">Menopause Forecast</div>
+            <div class="pay-summary-desc">Personal prediction based on AMH + age + cycle pattern</div>
+            <ul class="pay-summary-features">
+              <li>✓ Estimated age of menopause onset</li>
+              <li>✓ Personalised to <%= profile.display_name %>'s data</li>
+              <li>✓ Result stored — view anytime for free</li>
+              <li>✓ Medical disclaimer &amp; interpretation guide included</li>
+            </ul>
+          </div>
+          <div class="pay-summary-right">
+            <div class="pay-price-main">₹49</div>
+            <del class="pay-price-orig">₹199</del>
+            <div class="pay-price-tag">75% off · One-time</div>
+          </div>
+        </div>
+
+        <!-- Form -->
+        <div class="forecast-form-card">
+          <h2 style="font-family:var(--font-serif);font-size:22px;margin-bottom:6px;">Enter your details</h2>
+          <p style="color:var(--stone);font-size:14px;margin-bottom:24px;">All fields are required. Your AMH value should be from a blood test taken within the last 12 months.</p>
+
+          <% if (typeof error !== 'undefined' && error) { %>
+            <div class="auth-alert"><%= error %></div>
+          <% } %>
+
+          <form method="POST" action="/forecast/<%= profile.id %>">
+
+            <div class="auth-field">
+              <label for="Txt_age">Current age (years)</label>
+              <input type="number" id="Txt_age" name="Txt_age" required min="18" max="60" placeholder="e.g. 38" class="form-control">
+            </div>
+
+            <div class="auth-field">
+              <label for="cmbperiods">Menstrual cycle</label>
+              <select id="cmbperiods" name="cmbperiods" class="form-control" required>
+                <option value="">Select…</option>
+                <option value="R">Regular (cycle every 21–35 days)</option>
+                <option value="I">Irregular</option>
+              </select>
+            </div>
+
+            <div class="auth-field">
+              <label for="Txt_amh">AMH value (ng/mL)</label>
+              <input type="number" id="Txt_amh" name="Txt_amh" required step="0.01" min="0.01" max="20" placeholder="e.g. 2.50" class="form-control">
+              <span class="auth-field-hint">AMH is measured in ng/mL. Normal range: 0.9–9.5 ng/mL.</span>
+            </div>
+
+            <div class="pay-disclaimer">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <span>This is a <strong>predictive estimate</strong>, not a medical diagnosis. Always consult your gynaecologist for clinical advice.</span>
+            </div>
+
+            <button type="submit" class="auth-submit" style="margin-top:8px;">
+              Pay ₹49 &amp; Get My Forecast →
+            </button>
+            <p style="text-align:center;font-size:12px;color:var(--stone-400);margin-top:10px;">
+              🔒 Secure · No subscription · Result stored permanently on your profile
+            </p>
+          </form>
+        </div>
+
       </div>
-      <div class="pay-summary-right">
-        <div class="pay-price-main">₹49</div>
-        <del class="pay-price-orig">₹199</del>
-        <div class="pay-price-tag">75% off · One-time</div>
+
+      <!-- ─── RIGHT: AMH info ────────────────────────────────────── -->
+      <div class="fgated-info">
+
+        <div class="fc-info-card">
+          <div class="fc-info-card-icon fc-info-icon--rose">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <h3>What is AMH?</h3>
+          <p>Anti-Müllerian Hormone (AMH) is produced by the small follicles in your ovaries and directly reflects your ovarian reserve — the number of eggs you have remaining. It is the most accurate single biomarker for predicting when natural menopause will occur.</p>
+          <p style="margin-top:8px;">Unlike other hormones, AMH stays stable throughout your menstrual cycle, so it can be tested on any day of the month with a simple blood test.</p>
+        </div>
+
+        <div class="fc-info-card">
+          <div class="fc-info-card-icon fc-info-icon--amber">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>
+          <h3>Where to get tested</h3>
+          <ul class="fc-lab-list">
+            <li><span class="fc-lab-dot fc-lab-dot--rose"></span>SRL Diagnostics</li>
+            <li><span class="fc-lab-dot fc-lab-dot--amber"></span>Dr Lal PathLabs</li>
+            <li><span class="fc-lab-dot fc-lab-dot--green"></span>Metropolis Healthcare</li>
+            <li><span class="fc-lab-dot fc-lab-dot--purple"></span>Thyrocare</li>
+            <li><span class="fc-lab-dot fc-lab-dot--rose"></span>Any NABL-accredited lab</li>
+          </ul>
+        </div>
+
       </div>
-    </div>
 
-    <!-- Form -->
-    <div class="forecast-form-card">
-      <h2 style="font-family:var(--font-serif);font-size:22px;margin-bottom:6px;">Enter your details</h2>
-      <p style="color:var(--stone);font-size:14px;margin-bottom:24px;">All fields are required. Your AMH value should be from a blood test taken within the last 12 months.</p>
-
-      <% if (typeof error !== 'undefined' && error) { %>
-        <div class="auth-alert"><%= error %></div>
-      <% } %>
-
-      <form method="POST" action="/forecast/<%= profile.id %>">
-
-        <div class="auth-field">
-          <label for="Txt_age">Current age (years)</label>
-          <input type="number" id="Txt_age" name="Txt_age" required min="18" max="60" placeholder="e.g. 38" class="form-control">
-        </div>
-
-        <div class="auth-field">
-          <label for="cmbperiods">Menstrual cycle</label>
-          <select id="cmbperiods" name="cmbperiods" class="form-control" required>
-            <option value="">Select…</option>
-            <option value="R">Regular (cycle every 21–35 days)</option>
-            <option value="I">Irregular</option>
-          </select>
-        </div>
-
-        <div class="auth-field">
-          <label for="Txt_amh">AMH value (ng/mL)</label>
-          <input type="number" id="Txt_amh" name="Txt_amh" required step="0.01" min="0.01" max="20" placeholder="e.g. 2.50" class="form-control">
-          <span class="auth-field-hint">Normal range: 0.9 – 9.5 ng/mL. Convert pmol/L → ng/mL: divide by 7.14.</span>
-        </div>
-
-        <div class="pay-disclaimer">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          <span>This is a <strong>predictive estimate</strong>, not a medical diagnosis. Always consult your gynaecologist for clinical advice.</span>
-        </div>
-
-        <button type="submit" class="auth-submit" style="margin-top:8px;">
-          Pay ₹49 &amp; Get My Forecast →
-        </button>
-        <p style="text-align:center;font-size:12px;color:var(--stone-400);margin-top:10px;">
-          🔒 Secure · No subscription · Result stored permanently on your profile
-        </p>
-      </form>
     </div>
 
   </div>

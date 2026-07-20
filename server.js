@@ -294,13 +294,22 @@ app.get('/my-result/:profileId', requireConsumer, (req, res) => {
 
 // ─── Menopause Forecasting (legacy public form) ───────────────────────────────
 
-// Menopause Forecasting – GET
+// Menopause Forecasting – GET (gate landing)
 app.get('/forecasting.asp', (req, res) => {
+  if (req.session.consumerId) return res.redirect('/dashboard');
   res.render('forecasting');
 });
 
 // Menopause Forecasting Result – POST
+// Kept for backward compatibility with BMD clinic workflow.
+// Unauthenticated consumer requests are redirected to the gate landing.
 app.post('/mpresult.asp', (req, res) => {
+  // Require either a BMD clinic session or a consumer session.
+  // This prevents unauthenticated users from bypassing the gate by POSTing directly.
+  if (!req.session.userid && !req.session.consumerId) {
+    return res.redirect('/forecasting.asp');
+  }
+
   const { Txt_name, Txt_age, cmbperiods, Txt_amh } = req.body;
 
   let b0, b1, periods;

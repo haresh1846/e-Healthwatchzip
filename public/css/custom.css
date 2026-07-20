@@ -1204,3 +1204,191 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   #about-cont         { padding:40px 0; }
   .container          { padding:0 16px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORECASTING GATE LANDING PAGE
+   ═══════════════════════════════════════════════════════════════════ */
+
+.fc-gate-hero {
+  background: linear-gradient(135deg, var(--rose-bg) 0%, #fff7f0 60%, #fff 100%);
+  padding: 72px 0 64px;
+  border-bottom: 1px solid var(--border);
+}
+.fc-gate-hero__inner {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 48px;
+  align-items: center;
+}
+.fc-gate-hero__h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(30px, 4.5vw, 48px);
+  color: var(--stone-dark);
+  margin: 12px 0 16px;
+  line-height: 1.15;
+}
+.fc-gate-hero__sub {
+  font-size: 17px;
+  color: var(--stone);
+  line-height: 1.75;
+  margin-bottom: 28px;
+  max-width: 560px;
+}
+
+/* Benefits list */
+.fc-gate-benefits {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.fc-gate-benefits li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  color: var(--stone-dark);
+  font-weight: 600;
+}
+.fc-gate-benefits li svg { color: var(--rose); flex-shrink: 0; }
+
+/* Price row */
+.fc-gate-price-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.fc-gate-price-badge {
+  background: var(--rose);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 6px 18px;
+  border-radius: 100px;
+  letter-spacing: -0.3px;
+}
+.fc-gate-price-orig {
+  font-size: 15px;
+  color: var(--stone-400);
+}
+.fc-gate-price-tag {
+  font-size: 13px;
+  color: var(--stone);
+  font-weight: 500;
+}
+
+/* CTAs */
+.fc-gate-ctas {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.fc-gate-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--rose);
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 14px 26px;
+  border-radius: 12px;
+  text-decoration: none;
+  transition: background .18s, transform .15s;
+}
+.fc-gate-btn-primary:hover { background: var(--rose-dark, #c0392b); transform: translateY(-1px); }
+.fc-gate-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--stone-dark);
+  font-weight: 600;
+  font-size: 15px;
+  padding: 14px 26px;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  text-decoration: none;
+  transition: border-color .18s, background .18s;
+}
+.fc-gate-btn-secondary:hover { background: var(--stone-50, #f8f8f8); border-color: var(--stone-400); }
+
+/* Hero illustration */
+.fc-gate-hero__img-wrap { flex-shrink: 0; }
+.fc-gate-hero__img {
+  width: 320px;
+  border-radius: 20px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.10);
+  object-fit: cover;
+}
+
+/* AMH info section */
+.fc-gate-info {
+  background: #fff;
+  padding: 64px 0;
+}
+.fc-gate-info__inner {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 0 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.fc-gate-info-card {
+  background: var(--rose-bg);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px 28px 24px;
+}
+.fc-gate-info-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.fc-gate-info-card h2 {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  color: var(--stone-dark);
+  margin: 0 0 12px;
+}
+.fc-gate-info-card p {
+  font-size: 14px;
+  color: var(--stone);
+  line-height: 1.75;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   FORECAST GATED — two-column layout
+   ═══════════════════════════════════════════════════════════════════ */
+
+.fgated-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 28px;
+  align-items: start;
+  margin-top: 20px;
+}
+.fgated-main  { display: flex; flex-direction: column; gap: 20px; }
+.fgated-info  { display: flex; flex-direction: column; gap: 20px; }
+
+/* Responsive — gate landing */
+@media (max-width: 768px) {
+  .fc-gate-hero__inner  { grid-template-columns: 1fr; padding: 0 20px; }
+  .fc-gate-hero__img-wrap { display: none; }
+  .fc-gate-hero          { padding: 48px 0 40px; }
+  .fc-gate-info__inner   { grid-template-columns: 1fr; padding: 0 20px; }
+  .fc-gate-info          { padding: 40px 0; }
+  .fgated-layout         { grid-template-columns: 1fr; }
+  .fgated-info           { display: none; }
+}
