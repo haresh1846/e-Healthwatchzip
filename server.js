@@ -265,7 +265,63 @@ app.post('/bmdlogin.asp', async (req, res) => {
   }
 
   req.session.userid = user.username;
-  return res.redirect('/bmd.asp');
+  return res.redirect('/clinic-dashboard');
+});
+
+// BMD Logout
+app.get('/bmdlogout', (req, res) => {
+  req.session.userid = null;
+  res.redirect('/bmdlogin.asp');
+});
+
+// Clinic Dashboard – GET (auth required)
+app.get('/clinic-dashboard', (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+
+  const account = db.prepare(
+    'SELECT username, limitavailable, expirydate FROM bmdlogin WHERE username = ?'
+  ).get(req.session.userid);
+
+  if (!account) {
+    req.session.userid = null;
+    return res.redirect('/bmdlogin.asp');
+  }
+
+  const scansUsed = (db.prepare(
+    'SELECT COUNT(*) as cnt FROM bmd WHERE clinic_username = ?'
+  ).get(req.session.userid) || {}).cnt || 0;
+
+  const recent = db.prepare(
+    'SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC LIMIT 5'
+  ).all(req.session.userid).map(r => {
+    const h = parseFloat(r.height), w = parseFloat(r.weight);
+    const a = parseFloat(r.age), hal = parseFloat(r.hal), nsa = parseFloat(r.nsa);
+    let score = null;
+    if (![h, w, a, hal, nsa].some(isNaN)) {
+      score = (1.06861 * Math.pow(h * 0.01, 0.326842) * Math.pow(w, 0.211909) *
+               Math.pow(hal, 0.0608258) * Math.pow(a, -0.332916) *
+               Math.pow(nsa * 0.0174533, -0.239446)).toFixed(4);
+    }
+    return { ...r, score, dateStr: r.created_at ? r.created_at.slice(0, 10) : '—' };
+  });
+
+  // Expiry warning: flag if expiry is within 30 days or already past
+  const today = new Date();
+  let expiryWarning = false;
+  let expiryLabel = account.expirydate || 'No expiry set';
+  if (account.expirydate) {
+    const exp = new Date(account.expirydate);
+    const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 30) expiryWarning = true;
+  }
+
+  res.render('clinic-dashboard', {
+    account,
+    scansUsed,
+    recent,
+    expiryWarning,
+    expiryLabel,
+  });
 });
 
 // BMD Calculator – GET (auth required)
