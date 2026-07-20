@@ -17,8 +17,12 @@
       <% if (typeof error !== 'undefined' && error) { %>
         <div class="auth-alert"><%= error %></div>
       <% } %>
+      <% if (typeof info !== 'undefined' && info) { %>
+        <div class="auth-alert" style="background:#eef7f0;border-color:#bfe0c8;color:#2c6e49;"><%= info %></div>
+      <% } %>
 
       <form method="POST" action="/login" class="auth-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <input type="hidden" name="next" value="<%= typeof next !== 'undefined' ? next : '/dashboard' %>">
         <div class="auth-field">
           <label for="email">Email address</label>
@@ -26,7 +30,7 @@
         </div>
         <div class="auth-field">
           <label for="password" style="display:flex;justify-content:space-between;">
-            Password <a href="#" style="font-weight:400;color:var(--rose);font-size:13px;">Forgot password?</a>
+            Password <a href="/forgot-password" style="font-weight:400;color:var(--rose);font-size:13px;">Forgot password?</a>
           </label>
           <input type="password" id="password" name="password" required placeholder="Your password" class="form-control" autocomplete="current-password">
         </div>

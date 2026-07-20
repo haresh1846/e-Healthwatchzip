@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 const db = require('./db');
+const SqliteSessionStore = require('./session-store');
 
 // ─── Email transporter ────────────────────────────────────────────────────────
 // Lazily created so missing secrets don't crash startup; only contact form
@@ -23,13 +24,26 @@ function createMailTransporter() {
   });
 }
 
-const razorpay = new Razorpay({
-  key_id:     process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Lazily created for the same reason as the mail transporter: the constructor
+// throws without keys, which would prevent the whole site from starting.
+let razorpayClient = null;
+function getRazorpay() {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) return null;
+  if (!razorpayClient) {
+    razorpayClient = new Razorpay({
+      key_id:     process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+  }
+  return razorpayClient;
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Behind Replit's (or any host's) TLS-terminating proxy — needed so
+// `secure: 'auto'` session cookies detect HTTPS from X-Forwarded-Proto.
+app.set('trust proxy', 1);
 
 // View engine
 app.set('view engine', 'ejs');
@@ -117,6 +131,7 @@ app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), (req, r
         "UPDATE consumer_orders SET status = 'paid', gateway_payment_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).run(paymentId, orderRow.id);
       console.log('[Razorpay webhook] Order marked paid via webhook:', orderId);
+      sendReceiptEmail(orderRow.id);
     } else {
       console.log('[Razorpay webhook] Order already paid, skipping update:', orderId);
     }
@@ -130,11 +145,24 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // Session
+// A fixed fallback secret would let anyone forge session cookies, so without
+// SESSION_SECRET we use a random per-boot secret (sessions reset on restart).
+const sessionSecret = process.env.SESSION_SECRET || (() => {
+  console.warn('[session] SESSION_SECRET is not set — using a random per-boot secret. Set it in production so sessions survive restarts.');
+  return crypto.randomBytes(32).toString('hex');
+})();
+
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'ehealthwatch-secret-key',
+  store: new SqliteSessionStore(db),
+  secret: sessionSecret,
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 }
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: 'auto',
+  }
 }));
 
 // Helper: make session available in all templates
@@ -145,11 +173,84 @@ app.use((req, res, next) => {
   next();
 });
 
+// ─── CSRF protection ─────────────────────────────────────────────────────────
+// Every session gets a random token, exposed to all templates as csrfToken.
+// Every POST must echo it back in a hidden `_csrf` field. The Razorpay
+// webhook is unaffected: it is registered before the session middleware and
+// authenticates with an HMAC signature over the raw body instead.
+app.use((req, res, next) => {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(24).toString('hex');
+  }
+  res.locals.csrfToken = req.session.csrfToken;
+  next();
+});
+
+app.use((req, res, next) => {
+  if (req.method !== 'POST') return next();
+  const submitted = (req.body && req.body._csrf) || req.headers['x-csrf-token'] || '';
+  let valid = false;
+  try {
+    const a = Buffer.from(String(submitted));
+    const b = Buffer.from(req.session.csrfToken || '');
+    valid = a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch (_) {
+    valid = false;
+  }
+  if (!valid) {
+    console.warn('[CSRF] Rejected POST to', req.path);
+    return res.status(403).send('Invalid or missing security token. Please go back, refresh the page, and try again.');
+  }
+  next();
+});
+
+// ─── Login rate limiting ─────────────────────────────────────────────────────
+// Fixed-window in-memory limiter — enough to blunt credential stuffing on a
+// single-process deployment without adding a dependency.
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const rateBuckets = new Map();
+
+function rateLimited(bucket) {
+  const now = Date.now();
+  const entry = rateBuckets.get(bucket);
+  if (!entry || now - entry.start > RATE_LIMIT_WINDOW_MS) {
+    rateBuckets.set(bucket, { start: now, count: 1 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > RATE_LIMIT_MAX;
+}
+
+const rateLimitSweep = setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateBuckets) {
+    if (now - entry.start > RATE_LIMIT_WINDOW_MS) rateBuckets.delete(key);
+  }
+}, 60 * 1000);
+if (rateLimitSweep.unref) rateLimitSweep.unref();
+
+const RATE_LIMIT_MESSAGE = 'Too many attempts. Please wait 15 minutes and try again.';
+
 // Consumer auth guard
 function requireConsumer(req, res, next) {
   if (!req.session.consumerId) {
     return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
   }
+  next();
+}
+
+// Clinic auth guard — accounts still on the seeded default password are
+// forced through /clinic-password before they can use any clinic page, and
+// accounts disabled by the admin are signed out even mid-session.
+function requireClinic(req, res, next) {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  const acct = db.prepare('SELECT disabled FROM bmdlogin WHERE username = ?').get(req.session.userid);
+  if (!acct || acct.disabled) {
+    req.session.userid = null;
+    return res.redirect('/bmdlogin.asp?msg=' + encodeURIComponent('This account has been disabled. Please contact the administrator.'));
+  }
+  if (req.session.mustChangePassword) return res.redirect('/clinic-password');
   next();
 }
 
@@ -160,47 +261,90 @@ app.get(['/', '/index.asp'], (req, res) => {
   res.render('index', { contactSuccess: false });
 });
 
-// Home – POST (contact form)
-app.post(['/', '/index.asp'], async (req, res) => {
-  const { fname, lname, email, phone, comment } = req.body;
+// Shared contact-form email delivery, used by the home page and /contact.asp.
+// Failures are logged, never surfaced — a send failure must never break the page.
+async function sendContactEmail({ fname, lname, email, phone, comment }) {
   console.log('[Contact Form]', { fname, lname, email, phone, comment });
-
-  // Attempt to email the submission to the site owner.
-  // Always show success to the visitor — a send failure must never break the page.
   try {
     const transporter = createMailTransporter();
-    if (transporter) {
-      const ownerEmail = process.env.GMAIL_USER;
-      const senderName = [fname, lname].filter(Boolean).join(' ') || 'A visitor';
-      await transporter.sendMail({
-        from:     `"e-healthwatch Contact Form" <${ownerEmail}>`,
-        to:       ownerEmail,
-        replyTo:  email || ownerEmail,
-        subject:  `New enquiry from ${senderName} — e-healthwatch`,
-        text: [
-          `You have received a new contact form submission on e-healthwatch.`,
-          ``,
-          `Name:    ${senderName}`,
-          `Email:   ${email || '(not provided)'}`,
-          `Phone:   ${phone || '(not provided)'}`,
-          ``,
-          `Message:`,
-          comment || '(no message)',
-          ``,
-          `---`,
-          `Reply directly to this email to respond to the sender.`,
-        ].join('\n'),
-      });
-      console.log('[Contact Form] Email sent to', ownerEmail);
-    } else {
+    if (!transporter) {
       console.warn('[Contact Form] GMAIL_USER or GMAIL_APP_PASSWORD not set — email not sent');
+      return;
     }
+    const ownerEmail = process.env.GMAIL_USER;
+    const senderName = [fname, lname].filter(Boolean).join(' ') || 'A visitor';
+    await transporter.sendMail({
+      from:     `"e-healthwatch Contact Form" <${ownerEmail}>`,
+      to:       ownerEmail,
+      replyTo:  email || ownerEmail,
+      subject:  `New enquiry from ${senderName} — e-healthwatch`,
+      text: [
+        `You have received a new contact form submission on e-healthwatch.`,
+        ``,
+        `Name:    ${senderName}`,
+        `Email:   ${email || '(not provided)'}`,
+        `Phone:   ${phone || '(not provided)'}`,
+        ``,
+        `Message:`,
+        comment || '(no message)',
+        ``,
+        `---`,
+        `Reply directly to this email to respond to the sender.`,
+      ].join('\n'),
+    });
+    console.log('[Contact Form] Email sent to', ownerEmail);
   } catch (err) {
     console.error('[Contact Form] Failed to send email:', err.message);
   }
+}
 
+// Home – POST (contact form)
+app.post(['/', '/index.asp'], async (req, res) => {
+  await sendContactEmail(req.body);
   res.render('index', { contactSuccess: true });
 });
+
+// ─── Account emails (verification / password reset) ─────────────────────────
+
+function appBaseUrl(req) {
+  return process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`;
+}
+
+// Generates and stores a fresh token, then emails the verification link.
+// Without email configuration the link is logged so a developer/operator can
+// still complete the flow manually; the account works fine unverified.
+async function sendVerificationEmail(req, consumer) {
+  const token   = crypto.randomBytes(24).toString('hex');
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  db.prepare('UPDATE consumers SET verification_token = ?, verification_token_expires = ? WHERE id = ?')
+    .run(token, expires, consumer.id);
+
+  const link = `${appBaseUrl(req)}/verify-email?token=${token}`;
+  const transporter = createMailTransporter();
+  if (!transporter) {
+    console.warn('[verify-email] Email not configured — verification link for', consumer.email, 'is:', link);
+    return;
+  }
+  try {
+    await transporter.sendMail({
+      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      to:      consumer.email,
+      subject: 'Verify your email — e-healthwatch',
+      text: [
+        `Hello${consumer.full_name ? ' ' + consumer.full_name : ''},`,
+        ``,
+        `Please confirm your email address for your e-healthwatch account by opening this link:`,
+        ``,
+        link,
+        ``,
+        `The link is valid for 24 hours. If you did not create this account, you can ignore this email.`,
+      ].join('\n'),
+    });
+    console.log('[verify-email] Verification email sent to', consumer.email);
+  } catch (err) {
+    console.error('[verify-email] Failed to send:', err.message);
+  }
+}
 
 // Static content pages
 app.get('/health.asp', (req, res) => res.render('health'));
@@ -210,8 +354,15 @@ app.get('/pregnancy.asp', (req, res) => res.render('pregnancy'));
 app.get('/organ.asp', (req, res) => res.render('organ'));
 app.get('/data.asp', (req, res) => res.render('data'));
 
+// Privacy policy (DPDP notice)
+app.get('/privacy', (req, res) => res.render('privacy'));
+
 // Contact
-app.get(['/contact.asp', '/Contact.asp'], (req, res) => res.render('contact'));
+app.get(['/contact.asp', '/Contact.asp'], (req, res) => res.render('contact', { contactSuccess: false }));
+app.post(['/contact.asp', '/Contact.asp'], async (req, res) => {
+  await sendContactEmail(req.body);
+  res.render('contact', { contactSuccess: true });
+});
 
 // BMD Login – GET
 app.get('/bmdlogin.asp', (req, res) => {
@@ -221,6 +372,10 @@ app.get('/bmdlogin.asp', (req, res) => {
 
 // BMD Login – POST
 app.post('/bmdlogin.asp', async (req, res) => {
+  if (rateLimited('bmdlogin:' + req.ip)) {
+    return res.status(429).render('bmdlogin', { msg: RATE_LIMIT_MESSAGE });
+  }
+
   const { validate1, txtusername, txtpwd } = req.body;
 
   if (validate1 !== 'T') {
@@ -228,11 +383,15 @@ app.post('/bmdlogin.asp', async (req, res) => {
   }
 
   const user = db.prepare(
-    "SELECT username, pwd, expirydate, limitavailable FROM bmdlogin WHERE username = ?"
+    "SELECT username, pwd, expirydate, limitavailable, disabled FROM bmdlogin WHERE username = ?"
   ).get(txtusername);
 
   if (!user) {
     return res.render('bmdlogin', { msg: 'Invalid user credentials. Please try again.' });
+  }
+
+  if (user.disabled) {
+    return res.render('bmdlogin', { msg: 'This account has been disabled. Please contact the administrator.' });
   }
 
   // Determine whether the stored value is a bcrypt hash or a legacy plain-text password.
@@ -265,7 +424,40 @@ app.post('/bmdlogin.asp', async (req, res) => {
   }
 
   req.session.userid = user.username;
+
+  // The seeded default credentials are publicly documented — force a change
+  // before this account can use any clinic page.
+  if (user.username === 'admin' && txtpwd === 'admin123') {
+    req.session.mustChangePassword = true;
+    return res.redirect('/clinic-password');
+  }
+
   return res.redirect('/clinic-dashboard');
+});
+
+// Forced password change for clinic accounts on default credentials
+app.get('/clinic-password', (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  res.render('clinic-password', { error: null, username: req.session.userid });
+});
+app.post('/clinic-password', async (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  const username = req.session.userid;
+  const { new_password, confirm_password } = req.body;
+  if (!new_password || new_password.length < 8) {
+    return res.render('clinic-password', { error: 'Password must be at least 8 characters.', username });
+  }
+  if (new_password !== confirm_password) {
+    return res.render('clinic-password', { error: 'Passwords do not match.', username });
+  }
+  if (new_password === 'admin123') {
+    return res.render('clinic-password', { error: 'Please choose a password different from the default one.', username });
+  }
+  const hash = await bcrypt.hash(new_password, 12);
+  db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
+  console.log(`[BMD] Default password replaced for clinic account: ${username}`);
+  req.session.mustChangePassword = false;
+  res.redirect('/clinic-dashboard');
 });
 
 // BMD Logout
@@ -275,9 +467,7 @@ app.get('/bmdlogout', (req, res) => {
 });
 
 // Clinic Dashboard – GET (auth required)
-app.get('/clinic-dashboard', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-
+app.get('/clinic-dashboard', requireClinic, (req, res) => {
   const account = db.prepare(
     'SELECT username, limitavailable, expirydate FROM bmdlogin WHERE username = ?'
   ).get(req.session.userid);
@@ -325,15 +515,13 @@ app.get('/clinic-dashboard', (req, res) => {
 });
 
 // BMD Calculator – GET (auth required)
-app.get('/bmd.asp', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/bmd.asp', requireClinic, (req, res) => {
   req.session.guid = uuidv4();
   res.render('bmd', { bmdError: req.query.error || null });
 });
 
 // BMD Save – POST
-app.post('/bmdsave.asp', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.post('/bmdsave.asp', requireClinic, (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
   const user = db.prepare(
@@ -385,8 +573,7 @@ app.post('/bmdsave.asp', (req, res) => {
 });
 
 // BMD Result
-app.get('/result.asp', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/result.asp', requireClinic, (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
   const guid = req.session.guid;
@@ -444,9 +631,7 @@ app.get('/result.asp', (req, res) => {
 });
 
 // BMD Report – printable page for a specific record
-app.get('/bmd-report/:id', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-
+app.get('/bmd-report/:id', requireClinic, (req, res) => {
   const record = db.prepare(
     'SELECT * FROM bmd WHERE id = ? AND clinic_username = ?'
   ).get(req.params.id, req.session.userid);
@@ -491,8 +676,7 @@ app.get('/bmd-report/:id', (req, res) => {
 });
 
 // BMD History – all records for this clinic
-app.get('/bmd-history', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/bmd-history', requireClinic, (req, res) => {
   const records = db.prepare(
     "SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC"
   ).all(req.session.userid);
@@ -500,8 +684,7 @@ app.get('/bmd-history', (req, res) => {
 });
 
 // BMD History – per-patient view
-app.get('/bmd-patient/:name', (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+app.get('/bmd-patient/:name', requireClinic, (req, res) => {
   const name = req.params.name;
   const records = db.prepare(
     "SELECT * FROM bmd WHERE clinic_username = ? AND LOWER(name) = LOWER(?) ORDER BY id DESC"
@@ -517,6 +700,9 @@ app.get('/signup', (req, res) => {
   res.render('signup', { error: null });
 });
 app.post('/signup', async (req, res) => {
+  if (rateLimited('signup:' + req.ip)) {
+    return res.status(429).render('signup', { error: RATE_LIMIT_MESSAGE });
+  }
   const { full_name, email, password, confirm_password, consent } = req.body;
   if (!consent)                   return res.render('signup', { error: 'You must accept the privacy policy to continue.' });
   if (!password || password.length < 8) return res.render('signup', { error: 'Password must be at least 8 characters.' });
@@ -528,6 +714,7 @@ app.post('/signup', async (req, res) => {
     const r = db.prepare('INSERT INTO consumers (email, password_hash, full_name, consent_given_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null);
     req.session.consumerId   = r.lastInsertRowid;
     req.session.consumerName = full_name || email.split('@')[0];
+    await sendVerificationEmail(req, { id: r.lastInsertRowid, email, full_name });
     res.redirect('/dashboard');
   } catch (err) {
     console.error('[signup error]', err);
@@ -538,11 +725,18 @@ app.post('/signup', async (req, res) => {
 // Sign in
 app.get('/login', (req, res) => {
   if (req.session.consumerId) return res.redirect('/dashboard');
-  res.render('consumer-login', { error: null, next: req.query.next || '/dashboard' });
+  res.render('consumer-login', {
+    error: null,
+    info: req.query.reset === '1' ? 'Your password has been reset. Sign in with your new password.' : null,
+    next: req.query.next || '/dashboard',
+  });
 });
 app.post('/login', async (req, res) => {
   const { email, password, next } = req.body;
   const safeNext = (next && next.startsWith('/') && !next.startsWith('//')) ? next : '/dashboard';
+  if (rateLimited('login:' + req.ip)) {
+    return res.status(429).render('consumer-login', { error: RATE_LIMIT_MESSAGE, next: safeNext });
+  }
   try {
     const consumer = db.prepare('SELECT * FROM consumers WHERE email = ?').get(email);
     if (!consumer) return res.render('consumer-login', { error: 'No account found with this email.', next: safeNext });
@@ -555,6 +749,165 @@ app.post('/login', async (req, res) => {
     console.error('[login error]', err);
     res.render('consumer-login', { error: 'Something went wrong. Please try again.', next: safeNext });
   }
+});
+
+// Payment receipt, sent once when an order transitions to paid (from either
+// the browser verify path or the webhook — whichever gets there first).
+async function sendReceiptEmail(orderId) {
+  try {
+    const o = db.prepare(`
+      SELECT o.id, o.amount_paise, o.gateway_payment_id, o.paid_at,
+             c.email, c.full_name, p.display_name AS profile_name
+      FROM consumer_orders o
+      JOIN consumers c ON c.id = o.consumer_id
+      JOIN consumer_profiles p ON p.id = o.profile_id
+      WHERE o.id = ?
+    `).get(orderId);
+    if (!o) return;
+    const transporter = createMailTransporter();
+    if (!transporter) {
+      console.warn('[receipt] Email not configured — receipt not sent for order', orderId);
+      return;
+    }
+    await transporter.sendMail({
+      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      to:      o.email,
+      subject: `Payment receipt — Order #${o.id} — e-healthwatch`,
+      text: [
+        `Hello${o.full_name ? ' ' + o.full_name : ''},`,
+        ``,
+        `Thank you for your payment. Here is your receipt:`,
+        ``,
+        `Order number:  #${o.id}`,
+        `Product:       Menopause Forecast (profile: ${o.profile_name})`,
+        `Amount paid:   ₹${(o.amount_paise / 100).toFixed(2)}`,
+        `Payment ID:    ${o.gateway_payment_id || '—'}`,
+        `Date:          ${o.paid_at || new Date().toISOString()}`,
+        ``,
+        `Your result is stored permanently on your profile — sign in at any time to view it or download the report.`,
+        ``,
+        `— e-healthwatch`,
+      ].join('\n'),
+    });
+    console.log('[receipt] Receipt emailed for order', orderId);
+  } catch (err) {
+    console.error('[receipt] Failed to send receipt for order', orderId, ':', err.message);
+  }
+}
+
+// ─── Password reset ──────────────────────────────────────────────────────────
+
+async function sendPasswordResetEmail(req, consumer) {
+  const token   = crypto.randomBytes(24).toString('hex');
+  const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+  db.prepare('UPDATE consumers SET reset_token = ?, reset_token_expires = ? WHERE id = ?')
+    .run(token, expires, consumer.id);
+
+  const link = `${appBaseUrl(req)}/reset-password/${token}`;
+  const transporter = createMailTransporter();
+  if (!transporter) {
+    console.warn('[password-reset] Email not configured — reset link for', consumer.email, 'is:', link);
+    return;
+  }
+  try {
+    await transporter.sendMail({
+      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      to:      consumer.email,
+      subject: 'Reset your password — e-healthwatch',
+      text: [
+        `Hello${consumer.full_name ? ' ' + consumer.full_name : ''},`,
+        ``,
+        `Someone requested a password reset for your e-healthwatch account.`,
+        `To choose a new password, open this link (valid for 1 hour):`,
+        ``,
+        link,
+        ``,
+        `If you did not request this, you can safely ignore this email — your password is unchanged.`,
+      ].join('\n'),
+    });
+    console.log('[password-reset] Reset email sent to', consumer.email);
+  } catch (err) {
+    console.error('[password-reset] Failed to send:', err.message);
+  }
+}
+
+app.get('/forgot-password', (req, res) => {
+  if (req.session.consumerId) return res.redirect('/dashboard');
+  res.render('forgot-password', { sent: false });
+});
+
+app.post('/forgot-password', async (req, res) => {
+  if (rateLimited('forgot:' + req.ip)) {
+    return res.status(429).render('forgot-password', { sent: true });
+  }
+  const email = String(req.body.email || '').trim();
+  const consumer = email ? db.prepare('SELECT id, email, full_name FROM consumers WHERE email = ?').get(email) : null;
+  if (consumer) {
+    await sendPasswordResetEmail(req, consumer);
+  }
+  // Always claim success so the form can't be used to enumerate accounts
+  res.render('forgot-password', { sent: true });
+});
+
+function findConsumerByResetToken(token) {
+  if (!token) return null;
+  const row = db.prepare('SELECT id, reset_token_expires FROM consumers WHERE reset_token = ?').get(token);
+  if (!row) return null;
+  if (row.reset_token_expires && row.reset_token_expires < new Date().toISOString()) return null;
+  return row;
+}
+
+app.get('/reset-password/:token', (req, res) => {
+  const consumer = findConsumerByResetToken(req.params.token);
+  res.render('reset-password', { tokenValid: !!consumer, token: req.params.token, error: null });
+});
+
+app.post('/reset-password/:token', async (req, res) => {
+  const token = req.params.token;
+  const consumer = findConsumerByResetToken(token);
+  if (!consumer) {
+    return res.render('reset-password', { tokenValid: false, token, error: null });
+  }
+  const { password, confirm_password } = req.body;
+  if (!password || password.length < 8) {
+    return res.render('reset-password', { tokenValid: true, token, error: 'Password must be at least 8 characters.' });
+  }
+  if (password !== confirm_password) {
+    return res.render('reset-password', { tokenValid: true, token, error: 'Passwords do not match.' });
+  }
+  const password_hash = await bcrypt.hash(password, 12);
+  db.prepare('UPDATE consumers SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?')
+    .run(password_hash, consumer.id);
+  console.log('[password-reset] Password updated for consumer id', consumer.id);
+  res.redirect('/login?reset=1');
+});
+
+// Email verification — link target from the verification email
+app.get('/verify-email', (req, res) => {
+  const token = String(req.query.token || '');
+  let status = 'invalid';
+  if (token) {
+    const row = db.prepare('SELECT id, verification_token_expires FROM consumers WHERE verification_token = ?').get(token);
+    if (row) {
+      if (row.verification_token_expires && row.verification_token_expires < new Date().toISOString()) {
+        status = 'expired';
+      } else {
+        db.prepare('UPDATE consumers SET email_verified = 1, verification_token = NULL, verification_token_expires = NULL WHERE id = ?').run(row.id);
+        status = 'success';
+      }
+    }
+  }
+  res.render('verify-email', { status });
+});
+
+// Resend verification email (from the dashboard banner)
+app.post('/resend-verification', requireConsumer, async (req, res) => {
+  if (rateLimited('resend-verify:' + req.ip)) return res.redirect('/dashboard');
+  const consumer = db.prepare('SELECT id, email, full_name, email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
+  if (consumer && !consumer.email_verified) {
+    await sendVerificationEmail(req, consumer);
+  }
+  res.redirect('/dashboard?verifySent=1');
 });
 
 // Consumer logout
@@ -571,7 +924,13 @@ app.get('/dashboard', requireConsumer, (req, res) => {
     const paid = db.prepare('SELECT id FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(p.id, 'paid');
     return { ...p, hasPaidResult: !!paid };
   });
-  res.render('dashboard', { profiles: profilesWithStatus, consumerName: req.session.consumerName });
+  const consumer = db.prepare('SELECT email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
+  res.render('dashboard', {
+    profiles: profilesWithStatus,
+    consumerName: req.session.consumerName,
+    emailVerified: !!(consumer && consumer.email_verified),
+    verifySent: req.query.verifySent === '1',
+  });
 });
 
 // New profile
@@ -633,6 +992,12 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
   // Store form inputs in session for use after payment verification
   req.session.pendingForecast = { profileId: profile.id, Txt_age, cmbperiods, Txt_amh };
 
+  const razorpay = getRazorpay();
+  if (!razorpay) {
+    console.error('[Razorpay] RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET not configured');
+    return res.render('forecast-gated', { profile, error: 'Payments are not configured on this server. Please contact support.', razorpayOrder: null, razorpayKeyId: null });
+  }
+
   try {
     const consumer = db.prepare('SELECT email, full_name FROM consumers WHERE id = ?').get(req.session.consumerId);
     const receipt  = `ehw_${profile.id}_${Date.now()}`;
@@ -688,6 +1053,11 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).render('payment-error', { message: 'Missing payment fields. Please try again.', profileId: profile.id });
+  }
+
+  if (!process.env.RAZORPAY_KEY_SECRET) {
+    console.error('[Razorpay verify] RAZORPAY_KEY_SECRET not configured');
+    return res.status(503).render('payment-error', { message: 'Payments are not configured on this server. Please contact support.', profileId: profile.id });
   }
 
   // Verify HMAC signature using timing-safe comparison
@@ -806,7 +1176,23 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
 
   // Clear pending forecast from session
   req.session.pendingForecast = null;
+  sendReceiptEmail(orderRow.id);
   res.redirect('/my-result/' + profile.id);
+});
+
+// Consumer order history
+app.get('/orders', requireConsumer, (req, res) => {
+  const orders = db.prepare(`
+    SELECT o.id, o.amount_paise, o.status, o.gateway_payment_id, o.created_at, o.paid_at,
+           p.id AS profile_id, p.display_name AS profile_name,
+           r.id AS result_id
+    FROM consumer_orders o
+    JOIN consumer_profiles p ON p.id = o.profile_id
+    LEFT JOIN mp_results_v2 r ON r.order_id = o.id
+    WHERE o.consumer_id = ?
+    ORDER BY o.id DESC
+  `).all(req.session.consumerId);
+  res.render('orders', { orders });
 });
 
 // View stored result (always free after paying once)
@@ -820,6 +1206,35 @@ app.get('/my-result/:profileId', requireConsumer, (req, res) => {
   res.render('my-result', { profile, input: JSON.parse(row.input_json), result: JSON.parse(row.result_json), createdAt: row.created_at });
 });
 
+// Printable / PDF-ready report for a stored forecast result
+app.get('/forecast-report/:profileId', requireConsumer, (req, res) => {
+  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+  if (!profile) return res.redirect('/dashboard');
+  const paidOrder = db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
+  if (!paidOrder) return res.redirect('/profile/' + profile.id);
+  const row = db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
+  if (!row) return res.redirect('/profile/' + profile.id);
+
+  const input  = JSON.parse(row.input_json);
+  const result = JSON.parse(row.result_json);
+  const yearsToOnset = result.forecastAge - parseInt(input.age, 10);
+  const interpNote =
+    yearsToOnset > 15 ? `Based on the AMH level of ${input.amh} ng/mL, ovarian reserve appears well-preserved, with an estimated ${yearsToOnset} years before natural menopause onset — well within the expected range for the current age.` :
+    yearsToOnset > 8  ? `The AMH level of ${input.amh} ng/mL suggests a typical ovarian reserve for this age. The estimated timeline of ${yearsToOnset} years to menopause is within the normal range.` :
+                        `The AMH level of ${input.amh} ng/mL suggests ovarian reserve may be lower than average for this age. We recommend discussing this result with a gynaecologist for a full clinical assessment.`;
+
+  const dateFmt = { day: 'numeric', month: 'long', year: 'numeric' };
+  res.render('forecast-report', {
+    profile,
+    input,
+    result,
+    yearsToOnset,
+    interpNote,
+    printDate: new Date().toLocaleDateString('en-IN', dateFmt),
+    testDate:  new Date(row.created_at).toLocaleDateString('en-IN', dateFmt),
+  });
+});
+
 // ─── Menopause Forecasting (legacy public form) ───────────────────────────────
 
 // Menopause Forecasting – GET (gate landing)
@@ -829,13 +1244,12 @@ app.get('/forecasting.asp', (req, res) => {
 });
 
 // Menopause Forecasting Result – POST
-// Kept for backward compatibility with BMD clinic workflow.
-// Unauthenticated consumer requests are redirected to the gate landing.
+// Kept for backward compatibility with BMD clinic workflow only.
+// Consumers must go through the paid /forecast/:profileId flow — allowing a
+// consumer session here would let them compute the forecast without paying.
 app.post('/mpresult.asp', (req, res) => {
-  // Require either a BMD clinic session or a consumer session.
-  // This prevents unauthenticated users from bypassing the gate by POSTing directly.
-  if (!req.session.userid && !req.session.consumerId) {
-    return res.redirect('/forecasting.asp');
+  if (!req.session.userid) {
+    return res.redirect(req.session.consumerId ? '/dashboard' : '/forecasting.asp');
   }
 
   const { Txt_name, Txt_age, cmbperiods, Txt_amh } = req.body;
@@ -909,6 +1323,9 @@ app.get('/admin/login', (req, res) => {
 
 // POST /admin/login
 app.post('/admin/login', (req, res) => {
+  if (rateLimited('admin:' + req.ip)) {
+    return res.status(429).render('admin/login', { error: RATE_LIMIT_MESSAGE });
+  }
   const { password } = req.body;
   const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -1091,9 +1508,59 @@ app.get('/admin/bmd', requireAdmin, (req, res) => {
   res.render('admin/bmd', { records, ...getTabCounts() });
 });
 
+// POST /admin/clinic/create — new clinic account
+app.post('/admin/clinic/create', requireAdmin, async (req, res) => {
+  const username = String(req.body.username || '').trim();
+  const { password, expirydate, limitavailable } = req.body;
+
+  if (!/^[A-Za-z0-9_.-]{3,50}$/.test(username)) {
+    req.session.clinicFlash = { type: 'error', message: 'Username must be 3–50 characters (letters, numbers, dot, dash, underscore).' };
+    return res.redirect('/admin/clinic');
+  }
+  if (!password || password.length < 8) {
+    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 8 characters.' };
+    return res.redirect('/admin/clinic');
+  }
+  const limit = parseInt(limitavailable, 10);
+  if (isNaN(limit) || limit < 0) {
+    req.session.clinicFlash = { type: 'error', message: 'Scan limit must be a non-negative whole number.' };
+    return res.redirect('/admin/clinic');
+  }
+  if (expirydate && !/^\d{4}-\d{2}-\d{2}$/.test(expirydate)) {
+    req.session.clinicFlash = { type: 'error', message: 'Expiry date must be in YYYY-MM-DD format.' };
+    return res.redirect('/admin/clinic');
+  }
+  if (db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username)) {
+    req.session.clinicFlash = { type: 'error', message: `An account named "${username}" already exists.` };
+    return res.redirect('/admin/clinic');
+  }
+
+  const hash = await bcrypt.hash(password, 12);
+  db.prepare('INSERT INTO bmdlogin (username, pwd, expirydate, limitavailable) VALUES (?, ?, ?, ?)')
+    .run(username, hash, expirydate || null, limit);
+  console.log(`[Admin] Clinic account created: ${username}`);
+  req.session.clinicFlash = { type: 'success', message: `Clinic account "${username}" created.` };
+  res.redirect('/admin/clinic');
+});
+
+// POST /admin/clinic/:username/toggle — disable / re-enable an account
+app.post('/admin/clinic/:username/toggle', requireAdmin, (req, res) => {
+  const { username } = req.params;
+  const account = db.prepare('SELECT id, disabled FROM bmdlogin WHERE username = ?').get(username);
+  if (!account) {
+    req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
+    return res.redirect('/admin/clinic');
+  }
+  const newState = account.disabled ? 0 : 1;
+  db.prepare('UPDATE bmdlogin SET disabled = ? WHERE username = ?').run(newState, username);
+  console.log(`[Admin] Clinic account ${newState ? 'disabled' : 're-enabled'}: ${username}`);
+  req.session.clinicFlash = { type: 'success', message: `Account "${username}" ${newState ? 'disabled' : 're-enabled'}.` };
+  res.redirect('/admin/clinic');
+});
+
 // GET /admin/clinic
 app.get('/admin/clinic', requireAdmin, (req, res) => {
-  const rows = db.prepare('SELECT id, username, expirydate, limitavailable, pwd FROM bmdlogin ORDER BY id').all();
+  const rows = db.prepare('SELECT id, username, expirydate, limitavailable, disabled, pwd FROM bmdlogin ORDER BY id').all();
 
   const accounts = rows.map(r => ({
     ...r,
@@ -1123,8 +1590,8 @@ app.post('/admin/clinic/:username/password', requireAdmin, async (req, res) => {
   const { username } = req.params;
   const { new_password } = req.body;
 
-  if (!new_password || new_password.length < 4) {
-    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 4 characters.' };
+  if (!new_password || new_password.length < 8) {
+    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 8 characters.' };
     return res.redirect('/admin/clinic');
   }
 

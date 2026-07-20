@@ -2,7 +2,8 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'ehealthwatch.db'));
+// DB_PATH override lets tests run against an isolated throwaway database
+const db = new Database(process.env.DB_PATH || path.join(__dirname, 'ehealthwatch.db'));
 
 // Create tables
 db.exec(`
@@ -78,6 +79,13 @@ db.exec(`
 try { db.exec("ALTER TABLE consumers ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch (_) {}
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token TEXT"); } catch (_) {}
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token_expires DATETIME"); } catch (_) {}
+
+// Password reset token columns (same pattern as verification above)
+try { db.exec("ALTER TABLE consumers ADD COLUMN reset_token TEXT"); } catch (_) {}
+try { db.exec("ALTER TABLE consumers ADD COLUMN reset_token_expires DATETIME"); } catch (_) {}
+
+// Clinic accounts can be disabled by the admin without deleting their data
+try { db.exec("ALTER TABLE bmdlogin ADD COLUMN disabled INTEGER DEFAULT 0"); } catch (_) {}
 
 // Add clinic_username and created_at to bmd table so records persist and can be
 // associated with the logged-in clinic account (safe no-op if columns already exist)

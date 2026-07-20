@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Menopause Forecast Report — <%= profile.display_name %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Nunito:wght@400;600;700;800;900&display=swap">
+  <style>
+    /* ── Screen base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Nunito', system-ui, sans-serif;
+      background: #F1F5F9;
+      color: #334155;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .rpt-screen-bar {
+      background: #1E293B; color: #fff;
+      padding: 12px 32px; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+    }
+    .rpt-screen-bar a { color: #94A3B8; font-size: 13px; text-decoration: none; }
+    .rpt-screen-bar a:hover { color: #fff; }
+    .rpt-print-btn {
+      background: #E11D48; color: #fff; border: none; border-radius: 8px;
+      padding: 8px 18px; font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .rpt-print-btn:hover { background: #be123c; }
+    .rpt-wrap { max-width: 760px; margin: 28px auto 48px; padding: 0 16px; }
+
+    /* ── Report card ── */
+    .rpt { background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.1); overflow: hidden; }
+
+    .rpt-head {
+      background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+      padding: 28px 36px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    }
+    .rpt-head__brand { display: flex; align-items: center; gap: 12px; }
+    .rpt-head__logo-icon {
+      width: 44px; height: 44px; background: #E11D48; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rpt-head__logo-text { font-family: 'Lora', Georgia, serif; font-size: 20px; color: #fff; font-weight: 600; }
+    .rpt-head__logo-text span { color: #f87171; }
+    .rpt-head__meta { text-align: right; }
+    .rpt-head__title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #94A3B8; margin-bottom: 2px; }
+    .rpt-head__date  { font-size: 14px; color: #CBD5E1; }
+    .rpt-head__clinic { font-size: 13px; color: #94A3B8; margin-top: 2px; }
+
+    .rpt-body { padding: 32px 36px; }
+
+    .rpt-section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+      color: #94A3B8; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid #F1F5F9;
+    }
+    .rpt-patient-name { font-family: 'Lora', serif; font-size: 26px; font-weight: 700; color: #0F172A; margin-bottom: 20px; }
+
+    .rpt-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 14px; }
+    .rpt-table th {
+      text-align: left; padding: 8px 12px; background: #F8FAFC; color: #64748B;
+      font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+      border: 1px solid #E2E8F0;
+    }
+    .rpt-table td { padding: 10px 12px; border: 1px solid #E2E8F0; color: #334155; }
+    .rpt-table tr:nth-child(even) td { background: #FAFAFA; }
+
+    .rpt-score-card {
+      border-radius: 12px; padding: 22px 28px; margin-bottom: 20px;
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+      background: #FFF1F2; border: 1.5px solid #FECDD3;
+    }
+    .rpt-score-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #94A3B8; margin-bottom: 4px; }
+    .rpt-score-value { font-size: 44px; font-weight: 900; font-family: 'Courier New', monospace; line-height: 1; color: #BE123C; }
+    .rpt-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 20px; border-radius: 9999px; font-weight: 800; font-size: 16px;
+      background: #FFE4E6; color: #9F1239;
+    }
+
+    .rpt-note {
+      background: #F8FAFC; border-left: 4px solid #CBD5E1;
+      border-radius: 0 8px 8px 0; padding: 14px 18px; margin-bottom: 24px;
+      font-size: 14px; color: #334155; line-height: 1.65;
+    }
+
+    .rpt-disclaimer {
+      border-top: 1px solid #E2E8F0; padding-top: 18px; margin-top: 8px;
+      font-size: 11px; color: #94A3B8; line-height: 1.7;
+    }
+
+    /* ── Print styles ── */
+    @media print {
+      body { background: #fff !important; }
+      .rpt-screen-bar { display: none !important; }
+      .rpt-wrap { margin: 0; padding: 0; max-width: 100%; }
+      .rpt { box-shadow: none; border-radius: 0; }
+      .rpt-head { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .rpt-score-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .rpt-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Screen-only action bar -->
+<div class="rpt-screen-bar">
+  <div style="display:flex;gap:16px;align-items:center;">
+    <a href="/my-result/<%= profile.id %>">← Back to Result</a>
+    <a href="/dashboard">Dashboard</a>
+  </div>
+  <button class="rpt-print-btn" onclick="window.print()">
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+    Print / Save PDF
+  </button>
+</div>
+
+<!-- Report document -->
+<div class="rpt-wrap">
+<div class="rpt">
+
+  <!-- Header -->
+  <div class="rpt-head">
+    <div class="rpt-head__brand">
+      <div class="rpt-head__logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </div>
+      <div>
+        <div class="rpt-head__logo-text">e-<span>health</span>watch</div>
+        <div style="font-size:12px;color:#94A3B8;margin-top:1px;">Menopause Forecast Report</div>
+      </div>
+    </div>
+    <div class="rpt-head__meta">
+      <div class="rpt-head__title">Report Date</div>
+      <div class="rpt-head__date"><%= printDate %></div>
+      <div class="rpt-head__clinic">Tested: <%= testDate %></div>
+    </div>
+  </div>
+
+  <!-- Body -->
+  <div class="rpt-body">
+
+    <!-- Profile -->
+    <div class="rpt-section-label">Profile</div>
+    <div class="rpt-patient-name"><%= profile.display_name %> <span style="font-size:15px;color:#94A3B8;font-family:'Nunito',sans-serif;font-weight:600;">· <%= profile.relationship_label %></span></div>
+
+    <!-- Inputs -->
+    <div class="rpt-section-label">Test Inputs</div>
+    <table class="rpt-table">
+      <thead>
+        <tr>
+          <th>Parameter</th>
+          <th>Value</th>
+          <th>Unit / Type</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Age at test</td><td><%= input.age %></td><td>Years</td></tr>
+        <tr><td>Anti-Müllerian Hormone (AMH)</td><td><%= input.amh %></td><td>ng/mL</td></tr>
+        <tr><td>Menstrual cycle</td><td><%= input.periods %></td><td>Cycle regularity</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Forecast -->
+    <div class="rpt-section-label">Result</div>
+    <div class="rpt-score-card">
+      <div>
+        <div class="rpt-score-label">Estimated age of menopause onset</div>
+        <div class="rpt-score-value"><%= result.forecastAge %> yrs</div>
+      </div>
+      <div>
+        <div class="rpt-badge">≈ <%= yearsToOnset %> years from test age</div>
+        <div style="font-size:11px;color:#94A3B8;margin-top:6px;text-align:right;">AMH-based statistical model</div>
+      </div>
+    </div>
+
+    <!-- Interpretation note -->
+    <div class="rpt-note"><strong>Interpretation:</strong> <%= interpNote %></div>
+
+    <!-- Method -->
+    <div class="rpt-section-label">Method</div>
+    <div class="rpt-note" style="border-left-color:#FDA4AF;">
+      The forecast is derived from a published statistical association between serum AMH concentration and age at natural menopause, using the model variant matched to the reported cycle regularity (<%= input.periods.toLowerCase() %> cycles). AMH is currently the most reliable single biomarker for predicting menopause timing.
+    </div>
+
+    <!-- Disclaimer -->
+    <div class="rpt-disclaimer">
+      <strong>Disclaimer:</strong> This report is a statistical estimate generated by a mathematical prediction model and is for informational purposes only. It is not a clinical diagnosis or a substitute for laboratory investigation or specialist assessment. Individual results vary with health conditions, medications, and genetic factors. Please share this report with your gynaecologist for personalised medical advice. e-healthwatch accepts no liability for clinical decisions made solely on the basis of this report.
+    </div>
+
+  </div>
+</div>
+</div>
+
+</body>
+</html>

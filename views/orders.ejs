@@ -1,0 +1,49 @@
+<%- include('partials/header', { pageTitle: 'Order History — e-healthwatch', pageDesc: 'Your e-healthwatch payment and order history.' }) %>
+
+<div class="dash-bg">
+  <div class="dash-body" style="max-width:760px;padding-top:40px;padding-bottom:80px;">
+
+    <a href="/dashboard" class="auth-back" style="margin-bottom:24px;display:inline-flex;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to dashboard
+    </a>
+
+    <div class="dash-intro">
+      <h2>Order History</h2>
+      <p>Every payment on your account. Paid results stay available on their profile forever.</p>
+    </div>
+
+    <% if (orders.length === 0) { %>
+      <div class="dash-empty">
+        <div class="dash-empty-icon">🧾</div>
+        <h3>No orders yet</h3>
+        <p>When you take a Menopause Forecast test, your payment will appear here.</p>
+      </div>
+    <% } %>
+
+    <% orders.forEach(function(o) { %>
+      <div style="background:#fff;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:14px;padding:18px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:180px;">
+          <div style="font-weight:800;font-size:15px;color:#1f2937;">Menopause Forecast · <%= o.profile_name %></div>
+          <div style="font-size:12px;color:#94A3B8;margin-top:3px;">
+            Order #<%= o.id %>
+            &nbsp;·&nbsp; <%= (o.paid_at || o.created_at || '').slice(0, 10) %>
+            <% if (o.gateway_payment_id) { %>&nbsp;·&nbsp; Payment ID: <%= o.gateway_payment_id %><% } %>
+          </div>
+        </div>
+        <div style="font-weight:800;font-size:15px;color:#1f2937;">₹<%= (o.amount_paise / 100).toFixed(0) %></div>
+        <% if (o.status === 'paid') { %>
+          <span style="background:#DCFCE7;color:#15803D;border-radius:9999px;padding:4px 12px;font-size:12px;font-weight:700;">Paid</span>
+          <% if (o.result_id) { %>
+            <a href="/my-result/<%= o.profile_id %>" style="font-size:13px;font-weight:700;color:var(--rose);text-decoration:none;">View result →</a>
+          <% } %>
+        <% } else { %>
+          <span style="background:#F1F5F9;color:#64748B;border-radius:9999px;padding:4px 12px;font-size:12px;font-weight:700;">Not completed</span>
+        <% } %>
+      </div>
+    <% }); %>
+
+  </div>
+</div>
+
+<%- include('partials/footer') %>
