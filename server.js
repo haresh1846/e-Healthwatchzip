@@ -254,45 +254,46 @@ app.get(['/', '/index.asp'], (req, res) => {
   res.render('index', { contactSuccess: false });
 });
 
-// Home – POST (contact form)
-app.post(['/', '/index.asp'], async (req, res) => {
-  const { fname, lname, email, phone, comment } = req.body;
+// Shared contact-form email delivery, used by the home page and /contact.asp.
+// Failures are logged, never surfaced — a send failure must never break the page.
+async function sendContactEmail({ fname, lname, email, phone, comment }) {
   console.log('[Contact Form]', { fname, lname, email, phone, comment });
-
-  // Attempt to email the submission to the site owner.
-  // Always show success to the visitor — a send failure must never break the page.
   try {
     const transporter = createMailTransporter();
-    if (transporter) {
-      const ownerEmail = process.env.GMAIL_USER;
-      const senderName = [fname, lname].filter(Boolean).join(' ') || 'A visitor';
-      await transporter.sendMail({
-        from:     `"e-healthwatch Contact Form" <${ownerEmail}>`,
-        to:       ownerEmail,
-        replyTo:  email || ownerEmail,
-        subject:  `New enquiry from ${senderName} — e-healthwatch`,
-        text: [
-          `You have received a new contact form submission on e-healthwatch.`,
-          ``,
-          `Name:    ${senderName}`,
-          `Email:   ${email || '(not provided)'}`,
-          `Phone:   ${phone || '(not provided)'}`,
-          ``,
-          `Message:`,
-          comment || '(no message)',
-          ``,
-          `---`,
-          `Reply directly to this email to respond to the sender.`,
-        ].join('\n'),
-      });
-      console.log('[Contact Form] Email sent to', ownerEmail);
-    } else {
+    if (!transporter) {
       console.warn('[Contact Form] GMAIL_USER or GMAIL_APP_PASSWORD not set — email not sent');
+      return;
     }
+    const ownerEmail = process.env.GMAIL_USER;
+    const senderName = [fname, lname].filter(Boolean).join(' ') || 'A visitor';
+    await transporter.sendMail({
+      from:     `"e-healthwatch Contact Form" <${ownerEmail}>`,
+      to:       ownerEmail,
+      replyTo:  email || ownerEmail,
+      subject:  `New enquiry from ${senderName} — e-healthwatch`,
+      text: [
+        `You have received a new contact form submission on e-healthwatch.`,
+        ``,
+        `Name:    ${senderName}`,
+        `Email:   ${email || '(not provided)'}`,
+        `Phone:   ${phone || '(not provided)'}`,
+        ``,
+        `Message:`,
+        comment || '(no message)',
+        ``,
+        `---`,
+        `Reply directly to this email to respond to the sender.`,
+      ].join('\n'),
+    });
+    console.log('[Contact Form] Email sent to', ownerEmail);
   } catch (err) {
     console.error('[Contact Form] Failed to send email:', err.message);
   }
+}
 
+// Home – POST (contact form)
+app.post(['/', '/index.asp'], async (req, res) => {
+  await sendContactEmail(req.body);
   res.render('index', { contactSuccess: true });
 });
 
@@ -305,7 +306,11 @@ app.get('/organ.asp', (req, res) => res.render('organ'));
 app.get('/data.asp', (req, res) => res.render('data'));
 
 // Contact
-app.get(['/contact.asp', '/Contact.asp'], (req, res) => res.render('contact'));
+app.get(['/contact.asp', '/Contact.asp'], (req, res) => res.render('contact', { contactSuccess: false }));
+app.post(['/contact.asp', '/Contact.asp'], async (req, res) => {
+  await sendContactEmail(req.body);
+  res.render('contact', { contactSuccess: true });
+});
 
 // BMD Login – GET
 app.get('/bmdlogin.asp', (req, res) => {
