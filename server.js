@@ -52,8 +52,14 @@ app.set('views', path.join(__dirname, 'views'));
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// No request is served until the schema/seed init in db.js has completed —
+// matters on serverless cold starts where init races the first request.
+app.use((req, res, next) => {
+  db.ready.then(() => next(), next);
+});
+
 // Razorpay webhook — must be registered before bodyParser.json so it receives the raw body for HMAC verification
-app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   // Signature verification is mandatory. If RAZORPAY_WEBHOOK_SECRET is not set,
   // reject all webhook calls — the endpoint is effectively disabled until configured.
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -107,7 +113,7 @@ app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), (req, r
 
     // Validate the order belongs to us, has the expected amount and currency,
     // and is in a state that allows transitioning to paid (idempotent guard).
-    const orderRow = db.prepare(
+    const orderRow = await db.prepare(
       "SELECT id, status, amount_paise FROM consumer_orders WHERE gateway_order_id = ?"
     ).get(orderId);
 
@@ -127,7 +133,7 @@ app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), (req, r
 
     // Idempotent: only update if not already paid
     if (orderRow.status !== 'paid') {
-      db.prepare(
+      await db.prepare(
         "UPDATE consumer_orders SET status = 'paid', gateway_payment_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).run(paymentId, orderRow.id);
       console.log('[Razorpay webhook] Order marked paid via webhook:', orderId);
@@ -243,21 +249,25 @@ function requireConsumer(req, res, next) {
 // Clinic auth guard — accounts still on the seeded default password are
 // forced through /clinic-password before they can use any clinic page, and
 // accounts disabled by the admin are signed out even mid-session.
-function requireClinic(req, res, next) {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-  const acct = db.prepare('SELECT disabled FROM bmdlogin WHERE username = ?').get(req.session.userid);
-  if (!acct || acct.disabled) {
-    req.session.userid = null;
-    return res.redirect('/bmdlogin.asp?msg=' + encodeURIComponent('This account has been disabled. Please contact the administrator.'));
+async function requireClinic(req, res, next) {
+  try {
+    if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+    const acct = await db.prepare('SELECT disabled FROM bmdlogin WHERE username = ?').get(req.session.userid);
+    if (!acct || acct.disabled) {
+      req.session.userid = null;
+      return res.redirect('/bmdlogin.asp?msg=' + encodeURIComponent('This account has been disabled. Please contact the administrator.'));
+    }
+    if (req.session.mustChangePassword) return res.redirect('/clinic-password');
+    next();
+  } catch (err) {
+    next(err);
   }
-  if (req.session.mustChangePassword) return res.redirect('/clinic-password');
-  next();
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 // Home – GET
-app.get(['/', '/index.asp'], (req, res) => {
+app.get(['/', '/index.asp'], async (req, res) => {
   res.render('index', { contactSuccess: false });
 });
 
@@ -316,7 +326,7 @@ function appBaseUrl(req) {
 async function sendVerificationEmail(req, consumer) {
   const token   = crypto.randomBytes(24).toString('hex');
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  db.prepare('UPDATE consumers SET verification_token = ?, verification_token_expires = ? WHERE id = ?')
+  await db.prepare('UPDATE consumers SET verification_token = ?, verification_token_expires = ? WHERE id = ?')
     .run(token, expires, consumer.id);
 
   const link = `${appBaseUrl(req)}/verify-email?token=${token}`;
@@ -365,7 +375,7 @@ app.post(['/contact.asp', '/Contact.asp'], async (req, res) => {
 });
 
 // BMD Login – GET
-app.get('/bmdlogin.asp', (req, res) => {
+app.get('/bmdlogin.asp', async (req, res) => {
   const msg = req.query.msg || '';
   res.render('bmdlogin', { msg });
 });
@@ -382,7 +392,7 @@ app.post('/bmdlogin.asp', async (req, res) => {
     return res.render('bmdlogin', { msg: '' });
   }
 
-  const user = db.prepare(
+  const user = await db.prepare(
     "SELECT username, pwd, expirydate, limitavailable, disabled FROM bmdlogin WHERE username = ?"
   ).get(txtusername);
 
@@ -407,7 +417,7 @@ app.post('/bmdlogin.asp', async (req, res) => {
       // Transparently rehash on first successful login so the plain-text value
       // is replaced and will never be stored again.
       const newHash = await bcrypt.hash(txtpwd, 12);
-      db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(newHash, user.username);
+      await db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(newHash, user.username);
       console.log(`[BMD] Rehashed plain-text password for clinic account: ${user.username}`);
     }
   }
@@ -436,7 +446,7 @@ app.post('/bmdlogin.asp', async (req, res) => {
 });
 
 // Forced password change for clinic accounts on default credentials
-app.get('/clinic-password', (req, res) => {
+app.get('/clinic-password', async (req, res) => {
   if (!req.session.userid) return res.redirect('/bmdlogin.asp');
   res.render('clinic-password', { error: null, username: req.session.userid });
 });
@@ -454,21 +464,21 @@ app.post('/clinic-password', async (req, res) => {
     return res.render('clinic-password', { error: 'Please choose a password different from the default one.', username });
   }
   const hash = await bcrypt.hash(new_password, 12);
-  db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
+  await db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
   console.log(`[BMD] Default password replaced for clinic account: ${username}`);
   req.session.mustChangePassword = false;
   res.redirect('/clinic-dashboard');
 });
 
 // BMD Logout
-app.get('/bmdlogout', (req, res) => {
+app.get('/bmdlogout', async (req, res) => {
   req.session.userid = null;
   res.redirect('/bmdlogin.asp');
 });
 
 // Clinic Dashboard – GET (auth required)
-app.get('/clinic-dashboard', requireClinic, (req, res) => {
-  const account = db.prepare(
+app.get('/clinic-dashboard', requireClinic, async (req, res) => {
+  const account = await db.prepare(
     'SELECT username, limitavailable, expirydate FROM bmdlogin WHERE username = ?'
   ).get(req.session.userid);
 
@@ -477,11 +487,11 @@ app.get('/clinic-dashboard', requireClinic, (req, res) => {
     return res.redirect('/bmdlogin.asp');
   }
 
-  const scansUsed = (db.prepare(
+  const scansUsed = (await db.prepare(
     'SELECT COUNT(*) as cnt FROM bmd WHERE clinic_username = ?'
   ).get(req.session.userid) || {}).cnt || 0;
 
-  const recent = db.prepare(
+  const recent = await db.prepare(
     'SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC LIMIT 5'
   ).all(req.session.userid).map(r => {
     const h = parseFloat(r.height), w = parseFloat(r.weight);
@@ -515,16 +525,16 @@ app.get('/clinic-dashboard', requireClinic, (req, res) => {
 });
 
 // BMD Calculator – GET (auth required)
-app.get('/bmd.asp', requireClinic, (req, res) => {
+app.get('/bmd.asp', requireClinic, async (req, res) => {
   req.session.guid = uuidv4();
   res.render('bmd', { bmdError: req.query.error || null });
 });
 
 // BMD Save – POST
-app.post('/bmdsave.asp', requireClinic, (req, res) => {
+app.post('/bmdsave.asp', requireClinic, async (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
-  const user = db.prepare(
+  const user = await db.prepare(
     "SELECT limitavailable FROM bmdlogin WHERE username = ?"
   ).get(req.session.userid);
 
@@ -561,11 +571,11 @@ app.post('/bmdsave.asp', requireClinic, (req, res) => {
     return res.redirect('/bmd.asp?error=' + encodeURIComponent(bmdInputError));
   }
 
-  db.prepare(
+  await db.prepare(
     "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid, clinic_username) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
   ).run(Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, guid, req.session.userid);
 
-  db.prepare(
+  await db.prepare(
     "UPDATE bmdlogin SET limitavailable = limitavailable - 1 WHERE username = ?"
   ).run(req.session.userid);
 
@@ -573,11 +583,11 @@ app.post('/bmdsave.asp', requireClinic, (req, res) => {
 });
 
 // BMD Result
-app.get('/result.asp', requireClinic, (req, res) => {
+app.get('/result.asp', requireClinic, async (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
   const guid = req.session.guid;
-  const row = db.prepare("SELECT * FROM bmd WHERE guid = ?").get(guid);
+  const row = await db.prepare("SELECT * FROM bmd WHERE guid = ?").get(guid);
 
   if (!row) return res.redirect('/bmd.asp');
 
@@ -631,8 +641,8 @@ app.get('/result.asp', requireClinic, (req, res) => {
 });
 
 // BMD Report – printable page for a specific record
-app.get('/bmd-report/:id', requireClinic, (req, res) => {
-  const record = db.prepare(
+app.get('/bmd-report/:id', requireClinic, async (req, res) => {
+  const record = await db.prepare(
     'SELECT * FROM bmd WHERE id = ? AND clinic_username = ?'
   ).get(req.params.id, req.session.userid);
 
@@ -676,17 +686,17 @@ app.get('/bmd-report/:id', requireClinic, (req, res) => {
 });
 
 // BMD History – all records for this clinic
-app.get('/bmd-history', requireClinic, (req, res) => {
-  const records = db.prepare(
+app.get('/bmd-history', requireClinic, async (req, res) => {
+  const records = await db.prepare(
     "SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC"
   ).all(req.session.userid);
   res.render('bmd-history', { records, clinicUser: req.session.userid, patientFilter: null });
 });
 
 // BMD History – per-patient view
-app.get('/bmd-patient/:name', requireClinic, (req, res) => {
+app.get('/bmd-patient/:name', requireClinic, async (req, res) => {
   const name = req.params.name;
-  const records = db.prepare(
+  const records = await db.prepare(
     "SELECT * FROM bmd WHERE clinic_username = ? AND LOWER(name) = LOWER(?) ORDER BY id DESC"
   ).all(req.session.userid, name);
   res.render('bmd-history', { records, clinicUser: req.session.userid, patientFilter: name });
@@ -695,7 +705,7 @@ app.get('/bmd-patient/:name', requireClinic, (req, res) => {
 // ─── Consumer Account Routes ─────────────────────────────────────────────────
 
 // Sign up
-app.get('/signup', (req, res) => {
+app.get('/signup', async (req, res) => {
   if (req.session.consumerId) return res.redirect('/dashboard');
   res.render('signup', { error: null });
 });
@@ -708,10 +718,10 @@ app.post('/signup', async (req, res) => {
   if (!password || password.length < 8) return res.render('signup', { error: 'Password must be at least 8 characters.' });
   if (password !== confirm_password)    return res.render('signup', { error: 'Passwords do not match.' });
   try {
-    const existing = db.prepare('SELECT id FROM consumers WHERE email = ?').get(email);
+    const existing = await db.prepare('SELECT id FROM consumers WHERE email = ?').get(email);
     if (existing) return res.render('signup', { error: 'An account with this email already exists. Sign in instead.' });
     const password_hash = await bcrypt.hash(password, 12);
-    const r = db.prepare('INSERT INTO consumers (email, password_hash, full_name, consent_given_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null);
+    const r = await db.prepare('INSERT INTO consumers (email, password_hash, full_name, consent_given_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null);
     req.session.consumerId   = r.lastInsertRowid;
     req.session.consumerName = full_name || email.split('@')[0];
     await sendVerificationEmail(req, { id: r.lastInsertRowid, email, full_name });
@@ -723,7 +733,7 @@ app.post('/signup', async (req, res) => {
 });
 
 // Sign in
-app.get('/login', (req, res) => {
+app.get('/login', async (req, res) => {
   if (req.session.consumerId) return res.redirect('/dashboard');
   res.render('consumer-login', {
     error: null,
@@ -738,7 +748,7 @@ app.post('/login', async (req, res) => {
     return res.status(429).render('consumer-login', { error: RATE_LIMIT_MESSAGE, next: safeNext });
   }
   try {
-    const consumer = db.prepare('SELECT * FROM consumers WHERE email = ?').get(email);
+    const consumer = await db.prepare('SELECT * FROM consumers WHERE email = ?').get(email);
     if (!consumer) return res.render('consumer-login', { error: 'No account found with this email.', next: safeNext });
     const match = await bcrypt.compare(password, consumer.password_hash);
     if (!match)    return res.render('consumer-login', { error: 'Incorrect password. Please try again.', next: safeNext });
@@ -755,7 +765,7 @@ app.post('/login', async (req, res) => {
 // the browser verify path or the webhook — whichever gets there first).
 async function sendReceiptEmail(orderId) {
   try {
-    const o = db.prepare(`
+    const o = await db.prepare(`
       SELECT o.id, o.amount_paise, o.gateway_payment_id, o.paid_at,
              c.email, c.full_name, p.display_name AS profile_name
       FROM consumer_orders o
@@ -800,7 +810,7 @@ async function sendReceiptEmail(orderId) {
 async function sendPasswordResetEmail(req, consumer) {
   const token   = crypto.randomBytes(24).toString('hex');
   const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  db.prepare('UPDATE consumers SET reset_token = ?, reset_token_expires = ? WHERE id = ?')
+  await db.prepare('UPDATE consumers SET reset_token = ?, reset_token_expires = ? WHERE id = ?')
     .run(token, expires, consumer.id);
 
   const link = `${appBaseUrl(req)}/reset-password/${token}`;
@@ -831,7 +841,7 @@ async function sendPasswordResetEmail(req, consumer) {
   }
 }
 
-app.get('/forgot-password', (req, res) => {
+app.get('/forgot-password', async (req, res) => {
   if (req.session.consumerId) return res.redirect('/dashboard');
   res.render('forgot-password', { sent: false });
 });
@@ -841,7 +851,7 @@ app.post('/forgot-password', async (req, res) => {
     return res.status(429).render('forgot-password', { sent: true });
   }
   const email = String(req.body.email || '').trim();
-  const consumer = email ? db.prepare('SELECT id, email, full_name FROM consumers WHERE email = ?').get(email) : null;
+  const consumer = email ? await db.prepare('SELECT id, email, full_name FROM consumers WHERE email = ?').get(email) : null;
   if (consumer) {
     await sendPasswordResetEmail(req, consumer);
   }
@@ -849,22 +859,22 @@ app.post('/forgot-password', async (req, res) => {
   res.render('forgot-password', { sent: true });
 });
 
-function findConsumerByResetToken(token) {
+async function findConsumerByResetToken(token) {
   if (!token) return null;
-  const row = db.prepare('SELECT id, reset_token_expires FROM consumers WHERE reset_token = ?').get(token);
+  const row = await db.prepare('SELECT id, reset_token_expires FROM consumers WHERE reset_token = ?').get(token);
   if (!row) return null;
   if (row.reset_token_expires && row.reset_token_expires < new Date().toISOString()) return null;
   return row;
 }
 
-app.get('/reset-password/:token', (req, res) => {
-  const consumer = findConsumerByResetToken(req.params.token);
+app.get('/reset-password/:token', async (req, res) => {
+  const consumer = await findConsumerByResetToken(req.params.token);
   res.render('reset-password', { tokenValid: !!consumer, token: req.params.token, error: null });
 });
 
 app.post('/reset-password/:token', async (req, res) => {
   const token = req.params.token;
-  const consumer = findConsumerByResetToken(token);
+  const consumer = await findConsumerByResetToken(token);
   if (!consumer) {
     return res.render('reset-password', { tokenValid: false, token, error: null });
   }
@@ -876,23 +886,23 @@ app.post('/reset-password/:token', async (req, res) => {
     return res.render('reset-password', { tokenValid: true, token, error: 'Passwords do not match.' });
   }
   const password_hash = await bcrypt.hash(password, 12);
-  db.prepare('UPDATE consumers SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?')
+  await db.prepare('UPDATE consumers SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?')
     .run(password_hash, consumer.id);
   console.log('[password-reset] Password updated for consumer id', consumer.id);
   res.redirect('/login?reset=1');
 });
 
 // Email verification — link target from the verification email
-app.get('/verify-email', (req, res) => {
+app.get('/verify-email', async (req, res) => {
   const token = String(req.query.token || '');
   let status = 'invalid';
   if (token) {
-    const row = db.prepare('SELECT id, verification_token_expires FROM consumers WHERE verification_token = ?').get(token);
+    const row = await db.prepare('SELECT id, verification_token_expires FROM consumers WHERE verification_token = ?').get(token);
     if (row) {
       if (row.verification_token_expires && row.verification_token_expires < new Date().toISOString()) {
         status = 'expired';
       } else {
-        db.prepare('UPDATE consumers SET email_verified = 1, verification_token = NULL, verification_token_expires = NULL WHERE id = ?').run(row.id);
+        await db.prepare('UPDATE consumers SET email_verified = 1, verification_token = NULL, verification_token_expires = NULL WHERE id = ?').run(row.id);
         status = 'success';
       }
     }
@@ -903,7 +913,7 @@ app.get('/verify-email', (req, res) => {
 // Resend verification email (from the dashboard banner)
 app.post('/resend-verification', requireConsumer, async (req, res) => {
   if (rateLimited('resend-verify:' + req.ip)) return res.redirect('/dashboard');
-  const consumer = db.prepare('SELECT id, email, full_name, email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
+  const consumer = await db.prepare('SELECT id, email, full_name, email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
   if (consumer && !consumer.email_verified) {
     await sendVerificationEmail(req, consumer);
   }
@@ -911,20 +921,21 @@ app.post('/resend-verification', requireConsumer, async (req, res) => {
 });
 
 // Consumer logout
-app.get('/consumer-logout', (req, res) => {
+app.get('/consumer-logout', async (req, res) => {
   req.session.consumerId   = null;
   req.session.consumerName = null;
   res.redirect('/');
 });
 
 // Dashboard – profile picker
-app.get('/dashboard', requireConsumer, (req, res) => {
-  const profiles = db.prepare('SELECT * FROM consumer_profiles WHERE consumer_id = ? ORDER BY created_at').all(req.session.consumerId);
-  const profilesWithStatus = profiles.map((p, i) => {
-    const paid = db.prepare('SELECT id FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(p.id, 'paid');
-    return { ...p, hasPaidResult: !!paid };
-  });
-  const consumer = db.prepare('SELECT email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
+app.get('/dashboard', requireConsumer, async (req, res) => {
+  const profiles = await db.prepare('SELECT * FROM consumer_profiles WHERE consumer_id = ? ORDER BY created_at').all(req.session.consumerId);
+  const profilesWithStatus = [];
+  for (const p of profiles) {
+    const paid = await db.prepare('SELECT id FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(p.id, 'paid');
+    profilesWithStatus.push({ ...p, hasPaidResult: !!paid });
+  }
+  const consumer = await db.prepare('SELECT email_verified FROM consumers WHERE id = ?').get(req.session.consumerId);
   res.render('dashboard', {
     profiles: profilesWithStatus,
     consumerName: req.session.consumerName,
@@ -934,42 +945,42 @@ app.get('/dashboard', requireConsumer, (req, res) => {
 });
 
 // New profile
-app.get('/profile/new', requireConsumer, (req, res) => {
-  const count = db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId).cnt;
+app.get('/profile/new', requireConsumer, async (req, res) => {
+  const count = await db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId).cnt;
   if (count >= 3) return res.redirect('/dashboard');
   res.render('profile-new', { error: null });
 });
-app.post('/profile/new', requireConsumer, (req, res) => {
-  const count = db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId).cnt;
+app.post('/profile/new', requireConsumer, async (req, res) => {
+  const count = await db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId).cnt;
   if (count >= 3) return res.redirect('/dashboard');
   const { display_name, relationship_label, date_of_birth } = req.body;
-  const r = db.prepare('INSERT INTO consumer_profiles (consumer_id, display_name, relationship_label, date_of_birth) VALUES (?, ?, ?, ?)').run(req.session.consumerId, display_name, relationship_label || 'Self', date_of_birth || null);
+  const r = await db.prepare('INSERT INTO consumer_profiles (consumer_id, display_name, relationship_label, date_of_birth) VALUES (?, ?, ?, ?)').run(req.session.consumerId, display_name, relationship_label || 'Self', date_of_birth || null);
   res.redirect('/profile/' + r.lastInsertRowid);
 });
 
 // Profile detail
-app.get('/profile/:id', requireConsumer, (req, res) => {
-  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.id, req.session.consumerId);
+app.get('/profile/:id', requireConsumer, async (req, res) => {
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.id, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
-  const paidOrder = db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
+  const paidOrder = await db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
   let testResult = null;
   if (paidOrder) {
-    const row = db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
+    const row = await db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
     if (row) testResult = { ...JSON.parse(row.result_json), input: JSON.parse(row.input_json), createdAt: row.created_at };
   }
   res.render('profile', { profile, testResult, hasPaidResult: !!paidOrder });
 });
 
 // Forecast form (gated – requires consumer login)
-app.get('/forecast/:profileId', requireConsumer, (req, res) => {
-  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+app.get('/forecast/:profileId', requireConsumer, async (req, res) => {
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
   res.render('forecast-gated', { profile, error: null, razorpayOrder: null, razorpayKeyId: null });
 });
 
 // Step 1: Validate form inputs → create Razorpay order → re-render with widget data
 app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
-  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
 
   const { Txt_age, cmbperiods, Txt_amh } = req.body;
@@ -999,7 +1010,7 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
   }
 
   try {
-    const consumer = db.prepare('SELECT email, full_name FROM consumers WHERE id = ?').get(req.session.consumerId);
+    const consumer = await db.prepare('SELECT email, full_name FROM consumers WHERE id = ?').get(req.session.consumerId);
     const receipt  = `ehw_${profile.id}_${Date.now()}`;
 
     // Create order in Razorpay
@@ -1014,7 +1025,7 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
     });
 
     // Persist the order record (status = created)
-    db.prepare(
+    await db.prepare(
       'INSERT INTO consumer_orders (consumer_id, profile_id, status, gateway_order_id) VALUES (?, ?, ?, ?)'
     ).run(req.session.consumerId, profile.id, 'created', rzpOrder.id);
 
@@ -1045,8 +1056,8 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
 });
 
 // Step 2: Verify Razorpay signature → run forecast → save result → redirect
-app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
-  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+app.post('/forecast/:profileId/verify', requireConsumer, async (req, res) => {
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
 
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
@@ -1092,20 +1103,20 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
 
   // Require the local order row to exist, belong to this consumer + profile, and still be in 'created' state.
   // No fallback creation — fulfillment is only possible for server-created orders.
-  const orderRow = db.prepare(
+  const orderRow = await db.prepare(
     "SELECT id, status, amount_paise FROM consumer_orders WHERE gateway_order_id = ? AND consumer_id = ? AND profile_id = ? AND status = 'created'"
   ).get(razorpay_order_id, req.session.consumerId, profile.id);
 
   if (!orderRow) {
     // Order may have already been fulfilled via webhook before the browser callback arrived.
     // Check if paid — if so, ensure a result row exists (backfill if session inputs are still present).
-    const alreadyPaid = db.prepare(
+    const alreadyPaid = await db.prepare(
       "SELECT id FROM consumer_orders WHERE gateway_order_id = ? AND consumer_id = ? AND profile_id = ? AND status = 'paid'"
     ).get(razorpay_order_id, req.session.consumerId, profile.id);
 
     if (alreadyPaid) {
       // Check whether result was already written
-      const existingResult = db.prepare(
+      const existingResult = await db.prepare(
         'SELECT id FROM mp_results_v2 WHERE order_id = ?'
       ).get(alreadyPaid.id);
 
@@ -1120,7 +1131,7 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
           const bP     = bPeriods === 'R' ? 'Regular' : 'Irregular';
           const bAmhV  = parseFloat(bAmh);
           const bFm    = Math.round(bb0 * Math.pow(bAmhV, bb1));
-          db.prepare(
+          await db.prepare(
             'INSERT OR IGNORE INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES (?, ?, ?, ?)'
           ).run(
             alreadyPaid.id, profile.id,
@@ -1159,20 +1170,21 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
   const amhvalue = parseFloat(Txt_amh);
   const fmvalue  = Math.round(b0 * Math.pow(amhvalue, b1));
 
-  // Mark order paid and persist result — both in one synchronous SQLite transaction
-  db.transaction(() => {
-    db.prepare(
-      "UPDATE consumer_orders SET status = 'paid', gateway_payment_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?"
-    ).run(razorpay_payment_id, orderRow.id);
-
-    db.prepare(
-      'INSERT OR IGNORE INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES (?, ?, ?, ?)'
-    ).run(
-      orderRow.id, profile.id,
-      JSON.stringify({ age: Txt_age, amh: amhvalue, periods }),
-      JSON.stringify({ forecastAge: fmvalue, periods, amhvalue })
-    );
-  })();
+  // Mark order paid and persist result — both in one atomic batch
+  await db.batch([
+    {
+      sql: "UPDATE consumer_orders SET status = 'paid', gateway_payment_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?",
+      args: [razorpay_payment_id, orderRow.id],
+    },
+    {
+      sql: 'INSERT OR IGNORE INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES (?, ?, ?, ?)',
+      args: [
+        orderRow.id, profile.id,
+        JSON.stringify({ age: Txt_age, amh: amhvalue, periods }),
+        JSON.stringify({ forecastAge: fmvalue, periods, amhvalue }),
+      ],
+    },
+  ]);
 
   // Clear pending forecast from session
   req.session.pendingForecast = null;
@@ -1181,8 +1193,8 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
 });
 
 // Consumer order history
-app.get('/orders', requireConsumer, (req, res) => {
-  const orders = db.prepare(`
+app.get('/orders', requireConsumer, async (req, res) => {
+  const orders = await db.prepare(`
     SELECT o.id, o.amount_paise, o.status, o.gateway_payment_id, o.created_at, o.paid_at,
            p.id AS profile_id, p.display_name AS profile_name,
            r.id AS result_id
@@ -1196,23 +1208,23 @@ app.get('/orders', requireConsumer, (req, res) => {
 });
 
 // View stored result (always free after paying once)
-app.get('/my-result/:profileId', requireConsumer, (req, res) => {
-  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+app.get('/my-result/:profileId', requireConsumer, async (req, res) => {
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
-  const paidOrder = db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
+  const paidOrder = await db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
   if (!paidOrder) return res.redirect('/profile/' + profile.id);
-  const row = db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
+  const row = await db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
   if (!row) return res.redirect('/profile/' + profile.id);
   res.render('my-result', { profile, input: JSON.parse(row.input_json), result: JSON.parse(row.result_json), createdAt: row.created_at });
 });
 
 // Printable / PDF-ready report for a stored forecast result
-app.get('/forecast-report/:profileId', requireConsumer, (req, res) => {
-  const profile = db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+app.get('/forecast-report/:profileId', requireConsumer, async (req, res) => {
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
-  const paidOrder = db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
+  const paidOrder = await db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
   if (!paidOrder) return res.redirect('/profile/' + profile.id);
-  const row = db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
+  const row = await db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
   if (!row) return res.redirect('/profile/' + profile.id);
 
   const input  = JSON.parse(row.input_json);
@@ -1238,7 +1250,7 @@ app.get('/forecast-report/:profileId', requireConsumer, (req, res) => {
 // ─── Menopause Forecasting (legacy public form) ───────────────────────────────
 
 // Menopause Forecasting – GET (gate landing)
-app.get('/forecasting.asp', (req, res) => {
+app.get('/forecasting.asp', async (req, res) => {
   if (req.session.consumerId) return res.redirect('/dashboard');
   res.render('forecasting');
 });
@@ -1247,7 +1259,7 @@ app.get('/forecasting.asp', (req, res) => {
 // Kept for backward compatibility with BMD clinic workflow only.
 // Consumers must go through the paid /forecast/:profileId flow — allowing a
 // consumer session here would let them compute the forecast without paying.
-app.post('/mpresult.asp', (req, res) => {
+app.post('/mpresult.asp', async (req, res) => {
   if (!req.session.userid) {
     return res.redirect(req.session.consumerId ? '/dashboard' : '/forecasting.asp');
   }
@@ -1278,7 +1290,7 @@ app.post('/mpresult.asp', (req, res) => {
 });
 
 // Logout
-app.get('/logout.asp', (req, res) => {
+app.get('/logout.asp', async (req, res) => {
   req.session.destroy();
   res.redirect('/bmdlogin.asp');
 });
@@ -1316,13 +1328,13 @@ function sendCsv(res, filename, columns, rows) {
 app.get('/admin', requireAdmin, (req, res) => res.redirect('/admin/users'));
 
 // GET /admin/login
-app.get('/admin/login', (req, res) => {
+app.get('/admin/login', async (req, res) => {
   if (req.session.adminLoggedIn) return res.redirect('/admin/users');
   res.render('admin/login', { error: null });
 });
 
 // POST /admin/login
-app.post('/admin/login', (req, res) => {
+app.post('/admin/login', async (req, res) => {
   if (rateLimited('admin:' + req.ip)) {
     return res.status(429).render('admin/login', { error: RATE_LIMIT_MESSAGE });
   }
@@ -1355,25 +1367,25 @@ app.post('/admin/login', (req, res) => {
 });
 
 // GET /admin/logout
-app.get('/admin/logout', (req, res) => {
+app.get('/admin/logout', async (req, res) => {
   req.session.adminLoggedIn = false;
   res.redirect('/admin/login');
 });
 
 // Shared counts helper (used in tab badges across all pages)
-function getTabCounts() {
+async function getTabCounts() {
   return {
-    userCount:   (db.prepare('SELECT COUNT(*) as c FROM consumers').get() || {}).c || 0,
-    orderCount:  (db.prepare('SELECT COUNT(*) as c FROM consumer_orders').get() || {}).c || 0,
-    resultCount: (db.prepare('SELECT COUNT(*) as c FROM mp_results_v2').get() || {}).c || 0,
-    bmdCount:    (db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
-    clinicCount: (db.prepare('SELECT COUNT(*) as c FROM bmdlogin').get() || {}).c || 0,
+    userCount:   (await db.prepare('SELECT COUNT(*) as c FROM consumers').get() || {}).c || 0,
+    orderCount:  (await db.prepare('SELECT COUNT(*) as c FROM consumer_orders').get() || {}).c || 0,
+    resultCount: (await db.prepare('SELECT COUNT(*) as c FROM mp_results_v2').get() || {}).c || 0,
+    bmdCount:    (await db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
+    clinicCount: (await db.prepare('SELECT COUNT(*) as c FROM bmdlogin').get() || {}).c || 0,
   };
 }
 
 // GET /admin/users
-app.get('/admin/users', requireAdmin, (req, res) => {
-  const users = db.prepare(`
+app.get('/admin/users', requireAdmin, async (req, res) => {
+  const users = await db.prepare(`
     SELECT c.id, c.email, c.full_name, c.email_verified, c.created_at,
            COUNT(p.id) as profile_count
     FROM consumers c
@@ -1398,13 +1410,13 @@ app.get('/admin/users', requireAdmin, (req, res) => {
     users,
     totalUsers: users.length,
     verifiedUsers,
-    ...getTabCounts(),
+    ...await getTabCounts(),
   });
 });
 
 // GET /admin/orders
-app.get('/admin/orders', requireAdmin, (req, res) => {
-  const orders = db.prepare(`
+app.get('/admin/orders', requireAdmin, async (req, res) => {
+  const orders = await db.prepare(`
     SELECT o.id, o.amount_paise, o.status, o.gateway_order_id, o.gateway_payment_id,
            o.created_at, o.paid_at,
            c.full_name as consumer_name, c.email as consumer_email,
@@ -1437,13 +1449,13 @@ app.get('/admin/orders', requireAdmin, (req, res) => {
     totalOrders: orders.length,
     paidOrders,
     paidRevenuePaise,
-    ...getTabCounts(),
+    ...await getTabCounts(),
   });
 });
 
 // GET /admin/results
-app.get('/admin/results', requireAdmin, (req, res) => {
-  const rows = db.prepare(`
+app.get('/admin/results', requireAdmin, async (req, res) => {
+  const rows = await db.prepare(`
     SELECT r.id, r.input_json, r.result_json, r.created_at,
            c.full_name as consumer_name, c.email as consumer_email,
            p.display_name as profile_name
@@ -1485,12 +1497,12 @@ app.get('/admin/results', requireAdmin, (req, res) => {
     ], results);
   }
 
-  res.render('admin/results', { results, ...getTabCounts() });
+  res.render('admin/results', { results, ...await getTabCounts() });
 });
 
 // GET /admin/bmd
-app.get('/admin/bmd', requireAdmin, (req, res) => {
-  const records = db.prepare('SELECT * FROM bmd ORDER BY id DESC').all();
+app.get('/admin/bmd', requireAdmin, async (req, res) => {
+  const records = await db.prepare('SELECT * FROM bmd ORDER BY id DESC').all();
 
   if (req.query.export === 'csv') {
     return sendCsv(res, 'bmd-records.csv', [
@@ -1505,7 +1517,7 @@ app.get('/admin/bmd', requireAdmin, (req, res) => {
     ], records);
   }
 
-  res.render('admin/bmd', { records, ...getTabCounts() });
+  res.render('admin/bmd', { records, ...await getTabCounts() });
 });
 
 // POST /admin/clinic/create — new clinic account
@@ -1530,13 +1542,13 @@ app.post('/admin/clinic/create', requireAdmin, async (req, res) => {
     req.session.clinicFlash = { type: 'error', message: 'Expiry date must be in YYYY-MM-DD format.' };
     return res.redirect('/admin/clinic');
   }
-  if (db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username)) {
+  if (await db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username)) {
     req.session.clinicFlash = { type: 'error', message: `An account named "${username}" already exists.` };
     return res.redirect('/admin/clinic');
   }
 
   const hash = await bcrypt.hash(password, 12);
-  db.prepare('INSERT INTO bmdlogin (username, pwd, expirydate, limitavailable) VALUES (?, ?, ?, ?)')
+  await db.prepare('INSERT INTO bmdlogin (username, pwd, expirydate, limitavailable) VALUES (?, ?, ?, ?)')
     .run(username, hash, expirydate || null, limit);
   console.log(`[Admin] Clinic account created: ${username}`);
   req.session.clinicFlash = { type: 'success', message: `Clinic account "${username}" created.` };
@@ -1544,23 +1556,23 @@ app.post('/admin/clinic/create', requireAdmin, async (req, res) => {
 });
 
 // POST /admin/clinic/:username/toggle — disable / re-enable an account
-app.post('/admin/clinic/:username/toggle', requireAdmin, (req, res) => {
+app.post('/admin/clinic/:username/toggle', requireAdmin, async (req, res) => {
   const { username } = req.params;
-  const account = db.prepare('SELECT id, disabled FROM bmdlogin WHERE username = ?').get(username);
+  const account = await db.prepare('SELECT id, disabled FROM bmdlogin WHERE username = ?').get(username);
   if (!account) {
     req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
     return res.redirect('/admin/clinic');
   }
   const newState = account.disabled ? 0 : 1;
-  db.prepare('UPDATE bmdlogin SET disabled = ? WHERE username = ?').run(newState, username);
+  await db.prepare('UPDATE bmdlogin SET disabled = ? WHERE username = ?').run(newState, username);
   console.log(`[Admin] Clinic account ${newState ? 'disabled' : 're-enabled'}: ${username}`);
   req.session.clinicFlash = { type: 'success', message: `Account "${username}" ${newState ? 'disabled' : 're-enabled'}.` };
   res.redirect('/admin/clinic');
 });
 
 // GET /admin/clinic
-app.get('/admin/clinic', requireAdmin, (req, res) => {
-  const rows = db.prepare('SELECT id, username, expirydate, limitavailable, disabled, pwd FROM bmdlogin ORDER BY id').all();
+app.get('/admin/clinic', requireAdmin, async (req, res) => {
+  const rows = await db.prepare('SELECT id, username, expirydate, limitavailable, disabled, pwd FROM bmdlogin ORDER BY id').all();
 
   const accounts = rows.map(r => ({
     ...r,
@@ -1580,7 +1592,7 @@ app.get('/admin/clinic', requireAdmin, (req, res) => {
     accounts,
     hasDefaultCredentials,
     flash: req.session.clinicFlash || null,
-    ...getTabCounts(),
+    ...await getTabCounts(),
   });
   req.session.clinicFlash = null;
 });
@@ -1595,21 +1607,21 @@ app.post('/admin/clinic/:username/password', requireAdmin, async (req, res) => {
     return res.redirect('/admin/clinic');
   }
 
-  const account = db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
+  const account = await db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
   if (!account) {
     req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
     return res.redirect('/admin/clinic');
   }
 
   const hash = await bcrypt.hash(new_password, 12);
-  db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
+  await db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
   console.log(`[Admin] Password hashed and updated for clinic account: ${username}`);
   req.session.clinicFlash = { type: 'success', message: `Password for "${username}" updated successfully.` };
   res.redirect('/admin/clinic');
 });
 
 // POST /admin/clinic/:username/settings
-app.post('/admin/clinic/:username/settings', requireAdmin, (req, res) => {
+app.post('/admin/clinic/:username/settings', requireAdmin, async (req, res) => {
   const { username } = req.params;
   const { expirydate, limitavailable } = req.body;
 
@@ -1625,13 +1637,13 @@ app.post('/admin/clinic/:username/settings', requireAdmin, (req, res) => {
     return res.redirect('/admin/clinic');
   }
 
-  const account = db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
+  const account = await db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
   if (!account) {
     req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
     return res.redirect('/admin/clinic');
   }
 
-  db.prepare('UPDATE bmdlogin SET expirydate = ?, limitavailable = ? WHERE username = ?')
+  await db.prepare('UPDATE bmdlogin SET expirydate = ?, limitavailable = ? WHERE username = ?')
     .run(expirydate || null, limit, username);
   console.log(`[Admin] Settings updated for clinic account: ${username} (expiry=${expirydate}, limit=${limit})`);
   req.session.clinicFlash = { type: 'success', message: `Settings for "${username}" saved.` };
@@ -1639,6 +1651,12 @@ app.post('/admin/clinic/:username/settings', requireAdmin, (req, res) => {
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`e-healthwatch running on port ${PORT}`);
-});
+// Listen only when run directly (node server.js). On Vercel the app is
+// imported by api/index.js and invoked per-request instead.
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`e-healthwatch running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
