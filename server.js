@@ -344,20 +344,47 @@ app.get('/result.asp', (req, res) => {
   const hal    = parseFloat(row.hal);
   const nsa    = parseFloat(row.nsa);
 
-  const result = (
+  const bmdScore = parseFloat((
     1.06861 *
     Math.pow(height * 0.01, 0.326842) *
     Math.pow(weight, 0.211909) *
     Math.pow(hal, 0.0608258) *
     Math.pow(age, -0.332916) *
     Math.pow(nsa * 0.0174533, -0.239446)
-  ).toFixed(4);
+  ).toFixed(4));
+
+  // WHO classification thresholds for femoral neck BMD (g/cm²)
+  // Based on NHANES III reference data: young adult mean 0.858, SD 0.120
+  //   T-score −1.0  →  BMD ≥ 0.738  → Normal
+  //   T-score −2.5  →  BMD ≥ 0.558  → Osteopenia
+  //                    BMD  < 0.558  → Osteoporosis
+  let classification, classColor, classNote;
+  if (bmdScore >= 0.738) {
+    classification = 'Normal';
+    classColor     = 'green';
+    classNote      = 'Bone density is within the normal range. Maintain with regular weight-bearing exercise and adequate calcium intake.';
+  } else if (bmdScore >= 0.558) {
+    classification = 'Osteopenia';
+    classColor     = 'amber';
+    classNote      = 'Bone density is lower than normal. Consider lifestyle modifications, dietary calcium, vitamin D supplementation, and a DEXA scan for monitoring.';
+  } else {
+    classification = 'Osteoporosis';
+    classColor     = 'rose';
+    classNote      = 'Bone density is significantly reduced. Refer to a specialist for DEXA scan, pharmacological assessment, and fracture risk evaluation.';
+  }
 
   // Records are now kept permanently — no DELETE here.
   // Clear the guid from the session so Back → /bmd.asp gets a fresh form.
   req.session.guid = null;
 
-  res.render('result', { result, name: row.name, recordId: row.id });
+  res.render('result', {
+    result: bmdScore.toFixed(4),
+    name: row.name,
+    recordId: row.id,
+    classification,
+    classColor,
+    classNote,
+  });
 });
 
 // BMD History – all records for this clinic
