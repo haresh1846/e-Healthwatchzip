@@ -24,6 +24,17 @@ description: Design system choices, graduation details, and gotchas for the e-he
 - `locals.userid` truthy → show Logout link; falsy → show BMD Login CTA
 - This is set in the Express middleware in `server.js` from `req.session.userid`
 
+## Consumer account flow (Phase 1 complete)
+- Routes: `/signup`, `/login`, `/consumer-logout`, `/dashboard`, `/profile/new`, `/profile/:id`, `/forecast/:profileId`, `/my-result/:profileId`
+- Session keys: `req.session.consumerId`, `req.session.consumerName` (separate from BMD `req.session.userid`)
+- Auth guard: `requireConsumer` middleware — redirects to `/login?next=<path>`
+- Password hashing: `bcryptjs` (pure JS, no native module issues)
+- Phase 1: payment is **simulated** — order is inserted as `status='paid'` immediately. Razorpay integration is Phase 2.
+- DB tables: `consumers`, `consumer_profiles` (max 3 per consumer), `consumer_orders`, `mp_results_v2`
+- Result retrieval: free forever after one paid order — query latest `status='paid'` order then join `mp_results_v2`
+
+**Why separate from BMD:** BMD is a clinic tool (requires X-ray values, license-counted). Consumer flow is self-service. Mixing them would complicate both.
+
 ## Contact form
 - Homepage form POSTs to `/` with fields: fname, lname, email, phone, comment
 - Server logs submission and re-renders index with `contactSuccess: true`
