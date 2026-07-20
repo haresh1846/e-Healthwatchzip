@@ -2,7 +2,8 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 
-const db = new Database(path.join(__dirname, 'ehealthwatch.db'));
+// DB_PATH override lets tests run against an isolated throwaway database
+const db = new Database(process.env.DB_PATH || path.join(__dirname, 'ehealthwatch.db'));
 
 // Create tables
 db.exec(`
