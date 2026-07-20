@@ -1,0 +1,112 @@
+# e-Healthwatch — Menopause Platform Plan (Draft for Approval)
+
+This is a plan, not a build — everything below is proposed for your review. Sections marked **[Your decision needed]** are places where I've made a default assumption but you should confirm or override it before I start building anything.
+
+## 0. What I looked at first
+
+Your Replit export (`e-Healthwatchzip-main`) is further along than the raw ASP files I reviewed earlier:
+- It's already been ported to **Node.js/Express + EJS + SQLite (better-sqlite3)** — a real, working rewrite, not just a design mockup.
+- The SQL injection issues from the old ASP code are **fixed** — all queries in `server.js` use parameterized `?` placeholders.
+- A homepage redesign ("Warm Wellness" theme — cream background, rose accent, Lora/Nunito fonts) is already built and graduated out of the design sandbox into production `views/`.
+- The ₹49 offer (vs ₹199 regular) is already reflected in the homepage copy as a **one-time payment, not a subscription** — consistent with what you're describing now.
+- There is **no real account system yet**: login is a single shared demo credential (`admin` / `admin123`), there's no signup flow, no multi-profile concept, and no payment gateway wired in — the "Get Full Access — ₹49" button currently just links to the demo login page.
+
+So the gap between where this is and what you're asking for is specifically: **real user accounts, 3 profiles per account, a pay-per-test paywall tied to payment gateway confirmation, and result storage the user can revisit anytime.** That's what this plan designs.
+
+## 1. Deep research findings
+
+**Competitive landscape.** Most menopause-focused apps in the market (Balance, Health & Her, Flo's Perimenopause Score, Clue, Caria, Horiva) are **symptom trackers sold as monthly/annual subscriptions** (roughly $9–12/month or $40–50/year) — you log how you feel over time. None of them are quite what e-Healthwatch does: a **one-time predictive calculation** (estimated age of menopause onset from an AMH blood value) rather than ongoing tracking. That's a genuine point of difference worth keeping, not something to blend away by copying subscription patterns from that category. One feature that stood out as a real differentiator across that category, though: **a clean, shareable PDF/report view of the result** — women are commonly told to bring structured records to a doctor's appointment, and a formatted one-pager beats a screenshot. Worth considering for your result page (see §6).
+
+**Payment gateways in India.** Razorpay, Cashfree, and PayU are the three mainstream options; all three support UPI, cards, and netbanking, and all can be integrated via a hosted checkout (Checkout.js / Payment Links) so card details never touch your own server — this keeps your PCI compliance scope minimal. Published fee comparisons for 2026 vary source to source and change with negotiated volume pricing, so I'd treat any specific percentage you read online as a starting point to verify directly with the provider rather than a fixed number. What matters more for a ₹49 impulse-purchase price point:
+- **UPI is the dominant rail** for a transaction this size in India, and by RBI rule, banks absorb the UPI cost on transactions up to ₹2,000 — meaning your effective cost on a lot of these ₹49 payments may be near-zero if UPI adoption is high.
+- **Checkout success rate** matters more than the headline fee at this scale — a failed/abandoned payment at ₹49 is pure lost conversion, not a fee difference. All three gateways are reasonable technical choices; Razorpay tends to be the most common default for Indian developer teams for documentation and ease of first integration.
+
+**India's data protection law (DPDP Act, 2023).** This is directly relevant since you're collecting health-related test inputs:
+- Consent for collecting personal data must be **free, specific, informed, and easy to withdraw** — you'll need a clear consent checkbox at signup (not a pre-ticked box) and a plain-language privacy notice.
+- The Act doesn't create a separate "sensitive data" category the way GDPR does, but health data is treated as high-risk in practice, and you must report data breaches regardless of severity.
+- Phased compliance deadlines run out to May 2027, but there's no reason not to build the consent/notice basics in from day one — it's cheap to do now and expensive to retrofit once you have real users and real payment records.
+- If your data volume/sensitivity ever triggers "Significant Data Fiduciary" status, extra obligations kick in (data protection officer, DPIA, independent audits) — not a concern at MVP scale, just worth knowing it exists.
+
+## 2. An important distinction I want to flag before the navigation plan
+
+Re-reading `pregnancy.asp`'s existing content, the **BMD calculator is not a consumer self-test** — it explicitly requires **HAL (hip axis length) and NSA (neck shaft angle), values measured from a digital X-ray**, originally paired with a physical device ("apparatus attached to the digital X-ray... through the ARM micro controller"). A woman at home cannot supply these numbers herself; this tool is built for a **clinician or clinic operator** to use on a patient, which is exactly why the current system gates it behind a shared login with a decrementing usage counter (`limitavailable`) rather than a self-service consumer account — it's licensed like clinic software, not sold like a consumer app.
+
+The **Menopause Forecasting test**, by contrast, only needs an AMH value (a blood test result the woman can get from any lab and type in herself) plus her age and cycle regularity — genuinely self-serviceable, and the thing you've said the whole platform should now center on.
+
+**[Your decision needed]:** I'd recommend keeping these as two separate products rather than folding BMD into the new consumer accounts-and-profiles system:
+- **Menopause Forecasting** → the new consumer flow below (free account → profile → pay ₹49 → result).
+- **BMD Calculator** → stays on its existing separate clinic-login system (or gets sold/licensed to clinics separately down the line).
+
+If you actually want BMD folded into the same consumer paywall (e.g. because clinics manually enter the X-ray values on the patient's behalf through the same account), that's buildable too — just flag it and I'll adjust the plan.
+
+## 3. Proposed user journey
+
+*(See the diagram above for the visual version of this.)*
+
+1. **Home page** — stays largely as already built: hero, "why menopause forecasting matters," how-it-works, pricing card, footer. Main CTA becomes "Get started free" rather than a direct link to login.
+2. **Create free account** — email (or phone) + password, DPDP consent checkbox, link to privacy notice. No payment at this step.
+3. **Profile picker** — Netflix-style tile screen: shows existing profiles (name + relationship label, e.g. "Self," "Mother," "Sister") plus an "Add profile" tile, disabled once 3 exist. Selecting a profile (or creating the first one) goes to that profile's dashboard.
+4. **Profile dashboard** — shows the Menopause Forecasting test with its current status: *Not yet taken* → "Take the test," or *Result available* → "View result" / "Retake test."
+5. **Test intake form** — name pre-filled from the profile, age, AMH value (with a short explainer of what AMH is and where to get it tested), cycle regularity. No calculation happens yet.
+6. **Payment (₹49)** — order summary, then the gateway's hosted checkout (UPI/card/netbanking). The result is only computed **after** the server independently verifies the payment — never on the strength of a client-side "success" redirect alone (see §5).
+7. **Result page** — shows the forecast with plain-language context and a medical disclaimer, plus "Download as PDF" and "Back to dashboard."
+8. **Return visits** — login → profile picker → profile dashboard → "View result" is always free and instant for anything already paid for; a genuinely new test (updated AMH months later) is a new ₹49 charge.
+9. **Account settings** — manage profiles (rename/remove, add up to 3), password reset, payment/order history, and a self-service "delete my account and data" option (this maps to a data-principal right under DPDP, and it's also just good practice).
+10. **Contact** — needs to actually work now; right now it's hard-coded "under construction" with no way to reach you at all.
+
+## 4. Data model (sketch)
+
+```
+users
+  id, email (unique), phone, password_hash, created_at,
+  consent_given_at, marketing_opt_in
+
+profiles                       -- max 3 per user, enforced in app logic
+  id, user_id (FK), display_name, relationship_label, date_of_birth, created_at
+
+orders
+  id, user_id (FK), profile_id (FK), product_code ('menopause_forecast'),
+  amount_paise, currency, gateway, gateway_order_id, gateway_payment_id,
+  status ('created' | 'paid' | 'failed' | 'refunded'), created_at, paid_at
+
+test_results
+  id, order_id (FK, unique)   -- one paid order = one stored result
+  profile_id (FK), product_code,
+  input_json (age, amh, cycle_regularity),
+  result_json (forecast age, model version),
+  created_at
+```
+
+Tying `test_results` to a specific paid `order` (rather than just to a profile) is what makes "pay once, view whenever" work cleanly, and what makes a retake unambiguously a new order/new charge rather than overwriting history — useful later if you ever want to show a woman how her forecast has shifted over repeated tests.
+
+## 5. Payment flow, done safely
+
+1. Server creates an order with the gateway for ₹49, tagged with `user_id` + `profile_id` + `product_code`.
+2. Client loads the gateway's hosted checkout using that order ID.
+3. On completion, the client gets a payment ID + signature back — the server **must** verify that signature itself before trusting the payment (never rely on the client telling you "it worked").
+4. A **webhook** from the gateway is the source of truth for payment status — the client-side redirect can fail to fire (closed tab, network blip) even when the payment succeeded, and the webhook is what prevents a paid customer from being stuck without their result.
+5. Only after server-side verification does the app compute the forecast and write the `test_results` row.
+6. **Refund policy** — worth deciding upfront and stating on the payment page: e.g. no refunds once a result has been generated (it's not a returnable good), but an automatic refund if payment succeeded and result generation failed for a technical reason.
+
+## 6. My own suggestions (please approve/reject each)
+
+1. **Split BMD from the consumer product**, as in §2 — keeps the new build simpler and matches what each tool actually is.
+2. **Add a downloadable PDF report** on the result page — a real differentiator versus subscription trackers, and genuinely useful for a doctor's visit.
+3. **Show an anonymized sample result** on the home page before asking anyone to pay — most competitors gate everything, and a "here's what you'll get" preview should help conversion at this price point.
+4. **Email/SMS payment receipt** after each successful order — builds trust, and gives you a paper trail if you ever need GST-compliant invoicing as volume grows.
+5. **Password reset flow from day one** — forgotten passwords are the single most common support request for any account system; cheap to build now, painful to bolt on later under user pressure.
+6. **Basic funnel analytics** (signup → profile created → test started → payment success/fail → result viewed) — at ₹49, knowing exactly where people drop off is worth more than almost any single feature.
+7. **A cheaper "retake" price** (e.g. ₹29) rather than charging full price again for a woman re-testing with an updated AMH a few months later — a small loyalty gesture that could meaningfully help retention. Open question either way.
+8. **Rate-limit signup and login** and hash passwords with bcrypt (the current demo login stores/compares plaintext) — non-negotiable once real accounts and real payments exist, flagging it here so it's an explicit line item rather than something assumed.
+
+## 7. Suggested build order
+
+1. **Foundation** — real signup/login (bcrypt, proper session store — the current setup uses Express's default in-memory session store, which isn't meant for production), profiles (max 3), fill in About/Contact.
+2. **Payment** — gateway integration, order + result tables, server-side verification + webhook, paywall on the test.
+3. **Result experience** — dashboard, PDF export, retake flow, email receipts.
+4. **Compliance & hardening** — DPDP consent notice and privacy policy page, CSRF protection, backups.
+5. **Growth** — BMD path decision, sample report, referral, SEO content.
+
+---
+
+Let me know which of the suggestions in §6 you want in, and confirm (or correct) the BMD split in §2 and the "pay-per-test, not pay-per-profile" pricing model in §4 — those are the two decisions that shape the whole build. Once that's settled I can start on Phase 1.
