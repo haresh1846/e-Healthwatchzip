@@ -201,7 +201,7 @@ app.post('/bmdlogin.asp', (req, res) => {
 app.get('/bmd.asp', (req, res) => {
   if (!req.session.userid) return res.redirect('/bmdlogin.asp');
   req.session.guid = uuidv4();
-  res.render('bmd');
+  res.render('bmd', { bmdError: req.query.error || null });
 });
 
 // BMD Save – POST
@@ -225,6 +225,26 @@ app.post('/bmdsave.asp', (req, res) => {
 
   const { Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa } = req.body;
   const guid = req.session.guid;
+
+  // Server-side validation: all numeric fields must be positive numbers
+  const ageV    = parseFloat(Txt_age);
+  const heightV = parseFloat(Txt_height);
+  const weightV = parseFloat(Txt_weight);
+  const halV    = parseFloat(Txt_hal);
+  const nsaV    = parseFloat(Txt_nsa);
+
+  const bmdInputError =
+    !Txt_name || Txt_name.trim() === ''              ? 'Name is required.' :
+    isNaN(ageV)    || ageV    <= 0                   ? 'Age must be a positive number.' :
+    isNaN(heightV) || heightV <= 0                   ? 'Height must be a positive number.' :
+    isNaN(weightV) || weightV <= 0                   ? 'Weight must be a positive number.' :
+    isNaN(halV)    || halV    <= 0                   ? 'HAL must be a positive number.' :
+    isNaN(nsaV)    || nsaV    <= 0                   ? 'NSA must be a positive number.' :
+    null;
+
+  if (bmdInputError) {
+    return res.redirect('/bmd.asp?error=' + encodeURIComponent(bmdInputError));
+  }
 
   db.prepare(
     "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -279,13 +299,18 @@ app.post('/signup', async (req, res) => {
   if (!consent)                   return res.render('signup', { error: 'You must accept the privacy policy to continue.' });
   if (!password || password.length < 8) return res.render('signup', { error: 'Password must be at least 8 characters.' });
   if (password !== confirm_password)    return res.render('signup', { error: 'Passwords do not match.' });
-  const existing = db.prepare('SELECT id FROM consumers WHERE email = ?').get(email);
-  if (existing) return res.render('signup', { error: 'An account with this email already exists. Sign in instead.' });
-  const password_hash = await bcrypt.hash(password, 12);
-  const r = db.prepare('INSERT INTO consumers (email, password_hash, full_name, consent_given_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null);
-  req.session.consumerId   = r.lastInsertRowid;
-  req.session.consumerName = full_name || email.split('@')[0];
-  res.redirect('/dashboard');
+  try {
+    const existing = db.prepare('SELECT id FROM consumers WHERE email = ?').get(email);
+    if (existing) return res.render('signup', { error: 'An account with this email already exists. Sign in instead.' });
+    const password_hash = await bcrypt.hash(password, 12);
+    const r = db.prepare('INSERT INTO consumers (email, password_hash, full_name, consent_given_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null);
+    req.session.consumerId   = r.lastInsertRowid;
+    req.session.consumerName = full_name || email.split('@')[0];
+    res.redirect('/dashboard');
+  } catch (err) {
+    console.error('[signup error]', err);
+    res.render('signup', { error: 'Something went wrong. Please try again.' });
+  }
 });
 
 // Sign in
@@ -296,13 +321,18 @@ app.get('/login', (req, res) => {
 app.post('/login', async (req, res) => {
   const { email, password, next } = req.body;
   const safeNext = (next && next.startsWith('/') && !next.startsWith('//')) ? next : '/dashboard';
-  const consumer = db.prepare('SELECT * FROM consumers WHERE email = ?').get(email);
-  if (!consumer) return res.render('consumer-login', { error: 'No account found with this email.', next: safeNext });
-  const match = await bcrypt.compare(password, consumer.password_hash);
-  if (!match)    return res.render('consumer-login', { error: 'Incorrect password. Please try again.', next: safeNext });
-  req.session.consumerId   = consumer.id;
-  req.session.consumerName = consumer.full_name || consumer.email.split('@')[0];
-  res.redirect(safeNext);
+  try {
+    const consumer = db.prepare('SELECT * FROM consumers WHERE email = ?').get(email);
+    if (!consumer) return res.render('consumer-login', { error: 'No account found with this email.', next: safeNext });
+    const match = await bcrypt.compare(password, consumer.password_hash);
+    if (!match)    return res.render('consumer-login', { error: 'Incorrect password. Please try again.', next: safeNext });
+    req.session.consumerId   = consumer.id;
+    req.session.consumerName = consumer.full_name || consumer.email.split('@')[0];
+    res.redirect(safeNext);
+  } catch (err) {
+    console.error('[login error]', err);
+    res.render('consumer-login', { error: 'Something went wrong. Please try again.', next: safeNext });
+  }
 });
 
 // Consumer logout
@@ -444,11 +474,18 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
     .update(`${razorpay_order_id}|${razorpay_payment_id}`)
     .digest('hex');
 
+  // Guard: signature must be a non-empty even-length hex string before calling timingSafeEqual
   let sigValid = false;
-  try {
-    sigValid = crypto.timingSafeEqual(Buffer.from(razorpay_signature, 'hex'), Buffer.from(expectedSig, 'hex'));
-  } catch (_) {
-    sigValid = false;
+  if (razorpay_signature && razorpay_signature.length > 0 && razorpay_signature.length % 2 === 0) {
+    try {
+      const sigBuf = Buffer.from(razorpay_signature, 'hex');
+      const expBuf = Buffer.from(expectedSig, 'hex');
+      if (sigBuf.length === expBuf.length) {
+        sigValid = crypto.timingSafeEqual(sigBuf, expBuf);
+      }
+    } catch (_) {
+      sigValid = false;
+    }
   }
   if (!sigValid) {
     console.error('[Razorpay verify] Signature mismatch', { razorpay_order_id });

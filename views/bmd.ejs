@@ -62,6 +62,13 @@ function calcfm() {
 <section id="about-cont">
   <div class="container">
     <div class="row">
+      <% if (locals.bmdError) { %>
+      <div class="col-xs-12" style="margin-bottom:12px;">
+        <div style="background:#FFF1F2;border:1px solid #FECDD3;color:#9f1239;border-radius:8px;padding:12px 16px;font-size:14px;">
+          ⚠ <%= bmdError %>
+        </div>
+      </div>
+      <% } %>
       <form name="frm_salableitems" method="post" action="/bmdsave.asp">
         <div class="col-lg-4 col-md-4 col-sm-4 col-xs-12">
           <h2 class="aboutpage-title">&nbsp;</h2>
