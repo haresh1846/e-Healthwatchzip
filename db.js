@@ -1,4 +1,5 @@
 const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 
 const db = new Database(path.join(__dirname, 'ehealthwatch.db'));
@@ -78,14 +79,33 @@ try { db.exec("ALTER TABLE consumers ADD COLUMN email_verified INTEGER DEFAULT 0
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token TEXT"); } catch (_) {}
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token_expires DATETIME"); } catch (_) {}
 
-// Seed a default user if none exists
+// Seed a default user if none exists — password stored as bcrypt hash from the start
 const existing = db.prepare("SELECT COUNT(*) as cnt FROM bmdlogin").get();
 if (existing.cnt === 0) {
+  const defaultHash = bcrypt.hashSync('admin123', 12);
   db.prepare(`
     INSERT INTO bmdlogin (username, pwd, expirydate, limitavailable)
-    VALUES ('admin', 'admin123', '2099-12-31', 999)
-  `).run();
-  console.log('Database seeded with default user: admin / admin123');
+    VALUES ('admin', ?, '2099-12-31', 999)
+  `).run(defaultHash);
+  console.log('Database seeded with default clinic account: admin (password hashed)');
+}
+
+// One-time startup migration: hash any bmdlogin passwords still stored as plain text.
+// This covers dormant accounts that have never logged in since the bcrypt change.
+{
+  const plainRows = db.prepare("SELECT id, pwd FROM bmdlogin").all()
+    .filter(r => r.pwd && !r.pwd.startsWith('$2'));
+  if (plainRows.length > 0) {
+    const update = db.prepare('UPDATE bmdlogin SET pwd = ? WHERE id = ?');
+    const migrate = db.transaction(() => {
+      for (const row of plainRows) {
+        const hash = bcrypt.hashSync(row.pwd, 12);
+        update.run(hash, row.id);
+      }
+    });
+    migrate();
+    console.log(`[DB] Migrated ${plainRows.length} plain-text bmdlogin password(s) to bcrypt hashes`);
+  }
 }
 
 module.exports = db;

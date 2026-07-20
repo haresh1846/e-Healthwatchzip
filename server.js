@@ -220,7 +220,7 @@ app.get('/bmdlogin.asp', (req, res) => {
 });
 
 // BMD Login – POST
-app.post('/bmdlogin.asp', (req, res) => {
+app.post('/bmdlogin.asp', async (req, res) => {
   const { validate1, txtusername, txtpwd } = req.body;
 
   if (validate1 !== 'T') {
@@ -228,10 +228,32 @@ app.post('/bmdlogin.asp', (req, res) => {
   }
 
   const user = db.prepare(
-    "SELECT username, pwd, expirydate, limitavailable FROM bmdlogin WHERE username = ? AND pwd = ?"
-  ).get(txtusername, txtpwd);
+    "SELECT username, pwd, expirydate, limitavailable FROM bmdlogin WHERE username = ?"
+  ).get(txtusername);
 
   if (!user) {
+    return res.render('bmdlogin', { msg: 'Invalid user credentials. Please try again.' });
+  }
+
+  // Determine whether the stored value is a bcrypt hash or a legacy plain-text password.
+  const isHashed = user.pwd && user.pwd.startsWith('$2');
+  let passwordValid = false;
+
+  if (isHashed) {
+    passwordValid = await bcrypt.compare(txtpwd, user.pwd);
+  } else {
+    // Legacy plain-text match
+    passwordValid = user.pwd === txtpwd;
+    if (passwordValid) {
+      // Transparently rehash on first successful login so the plain-text value
+      // is replaced and will never be stored again.
+      const newHash = await bcrypt.hash(txtpwd, 12);
+      db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(newHash, user.username);
+      console.log(`[BMD] Rehashed plain-text password for clinic account: ${user.username}`);
+    }
+  }
+
+  if (!passwordValid) {
     return res.render('bmdlogin', { msg: 'Invalid user credentials. Please try again.' });
   }
 
@@ -924,8 +946,12 @@ app.get('/admin/clinic', requireAdmin, (req, res) => {
 
   const accounts = rows.map(r => ({
     ...r,
-    // Expose whether this account still has the known-insecure default credentials
-    isDefault: r.username === 'admin' && r.pwd === 'admin123',
+    // Expose whether this account still has the known-insecure default credentials.
+    // Works for both legacy plain-text storage and post-migration bcrypt hashes.
+    isDefault: r.username === 'admin' && (
+      r.pwd === 'admin123' ||
+      (r.pwd && r.pwd.startsWith('$2') && bcrypt.compareSync('admin123', r.pwd))
+    ),
     // Strip pwd from the object passed to the template — never render passwords
     pwd: undefined,
   }));
@@ -942,7 +968,7 @@ app.get('/admin/clinic', requireAdmin, (req, res) => {
 });
 
 // POST /admin/clinic/:username/password
-app.post('/admin/clinic/:username/password', requireAdmin, (req, res) => {
+app.post('/admin/clinic/:username/password', requireAdmin, async (req, res) => {
   const { username } = req.params;
   const { new_password } = req.body;
 
@@ -957,8 +983,9 @@ app.post('/admin/clinic/:username/password', requireAdmin, (req, res) => {
     return res.redirect('/admin/clinic');
   }
 
-  db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(new_password, username);
-  console.log(`[Admin] Password updated for clinic account: ${username}`);
+  const hash = await bcrypt.hash(new_password, 12);
+  db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
+  console.log(`[Admin] Password hashed and updated for clinic account: ${username}`);
   req.session.clinicFlash = { type: 'success', message: `Password for "${username}" updated successfully.` };
   res.redirect('/admin/clinic');
 });
