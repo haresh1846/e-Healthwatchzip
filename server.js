@@ -354,6 +354,9 @@ app.get('/pregnancy.asp', (req, res) => res.render('pregnancy'));
 app.get('/organ.asp', (req, res) => res.render('organ'));
 app.get('/data.asp', (req, res) => res.render('data'));
 
+// Privacy policy (DPDP notice)
+app.get('/privacy', (req, res) => res.render('privacy'));
+
 // Contact
 app.get(['/contact.asp', '/Contact.asp'], (req, res) => res.render('contact', { contactSuccess: false }));
 app.post(['/contact.asp', '/Contact.asp'], async (req, res) => {
