@@ -10,8 +10,8 @@ A women's health platform — converted from Classic ASP to Node.js/Express — 
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Template engine**: EJS
-- **Database**: SQLite (via better-sqlite3, auto-created on first run; also stores sessions)
-- **Sessions**: express-session backed by a SQLite store (`session-store.js`)
+- **Database**: libSQL via `@libsql/client` — **Turso** (hosted) in production, a local SQLite file in development. Schema auto-created on first run; also stores sessions.
+- **Sessions**: express-session backed by the same database (`session-store.js`)
 - **Payments**: Razorpay (hosted checkout + server-side signature verification + webhook)
 - **Email**: Nodemailer via Gmail (contact form, verification, password reset, receipts)
 - **CSS**: single custom design system in `public/css/custom.css` (no Bootstrap; a small grid shim covers legacy page markup)
@@ -45,6 +45,8 @@ ehealthwatch.db   # SQLite database (auto-created on first run; gitignored)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `TURSO_DATABASE_URL` | production | Turso database URL (`libsql://...`). When unset, a local SQLite file is used (`ehealthwatch.db`, or `DB_PATH`). |
+| `TURSO_AUTH_TOKEN` | production | Auth token for the Turso database (create/revoke in the Turso dashboard). |
 | `SESSION_SECRET` | production | Secret for session cookie signing. Without it a random per-boot secret is used (sessions reset on restart). |
 | `PORT` | no | Port to listen on (default: 5000) |
 | `ADMIN_PASSWORD` | for admin panel | Password for `/admin` login. Admin login is refused if unset. |
@@ -93,6 +95,50 @@ ehealthwatch.db   # SQLite database (auto-created on first run; gitignored)
 | `/admin/login` | Admin login (timing-safe compare, rate-limited) |
 | `/admin/users`, `/admin/orders`, `/admin/results`, `/admin/bmd` | Data views, each with CSV export |
 | `/admin/clinic` | Clinic accounts: create, disable/re-enable, change password (bcrypt, min 8 chars), expiry & scan limits |
+| `/admin/analytics` | Marketing analytics: signup→profile→order→paid funnel, revenue, last-30-days daily trend, CSV export |
+
+## Deploying on Vercel (free tier) + Turso
+
+1. **Turso** (free tier): sign up at [turso.tech](https://turso.tech) → create a database (e.g. `ehealthwatch`) → copy its URL (`libsql://...`) and create an auth token.
+2. **Migrate existing data** (one-off, from wherever the old `ehealthwatch.db` file lives):
+   ```bash
+   TURSO_DATABASE_URL=libsql://<db>.turso.io TURSO_AUTH_TOKEN=<token> node scripts/migrate-to-turso.js
+   ```
+3. **Vercel**: import this GitHub repo at [vercel.com/new](https://vercel.com/new) (no framework preset needed — `vercel.json` + `api/index.js` handle routing) → add ALL environment variables from the table above (including `APP_BASE_URL=https://<your-app>.vercel.app`) → deploy.
+4. **Razorpay webhook**: point it at `https://<your-app>.vercel.app/razorpay-webhook`.
+5. Local development is unchanged: `node server.js` uses a local SQLite file when `TURSO_DATABASE_URL` is unset.
+
+## Analysing the database (marketing)
+
+Two secure ways in, no server changes needed:
+
+- **Admin Analytics tab** (`/admin/analytics`): funnel conversion, revenue, daily trend, CSV export — password-protected, no SQL required.
+- **Turso dashboard** ([app.turso.tech](https://app.turso.tech), enable 2FA on the account): browser SQL console with full read/write access over TLS. The database is never publicly exposed; access tokens can be revoked any time. Example queries:
+
+```sql
+-- Signups per day, last 30 days
+SELECT date(created_at) AS day, COUNT(*) AS signups
+FROM consumers WHERE created_at >= datetime('now','-30 day')
+GROUP BY day ORDER BY day DESC;
+
+-- Overall paid conversion
+SELECT (SELECT COUNT(DISTINCT consumer_id) FROM consumer_orders WHERE status='paid') * 100.0
+     / (SELECT COUNT(*) FROM consumers) AS paid_conversion_pct;
+
+-- Revenue per month
+SELECT strftime('%Y-%m', paid_at) AS month, SUM(amount_paise)/100.0 AS revenue_inr
+FROM consumer_orders WHERE status='paid' GROUP BY month ORDER BY month DESC;
+
+-- Funnel drop-off: users who created an order but never paid
+SELECT c.email, o.created_at
+FROM consumer_orders o JOIN consumers c ON c.id = o.consumer_id
+WHERE o.status = 'created'
+  AND NOT EXISTS (SELECT 1 FROM consumer_orders p WHERE p.consumer_id = o.consumer_id AND p.status = 'paid')
+ORDER BY o.created_at DESC;
+
+-- Email verification rate
+SELECT SUM(email_verified) * 100.0 / COUNT(*) AS verified_pct FROM consumers;
+```
 
 ## Security notes
 
