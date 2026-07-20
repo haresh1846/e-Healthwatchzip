@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= locals.pageTitle || 'Admin' %> — e-healthwatch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="/css/custom.css">
+  <style>
+    body { background: #F1F5F9; font-family: var(--font-sans); min-height: 100vh; }
+
+    /* Top bar */
+    .adm-topbar {
+      background: #1E293B; color: #fff; height: 56px;
+      display: flex; align-items: center; padding: 0 24px;
+      gap: 16px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    }
+    .adm-topbar-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; letter-spacing: -.2px; }
+    .adm-topbar-logo-icon { background: var(--rose); border-radius: 7px; width: 28px; height: 28px; display:flex; align-items:center; justify-content:center; }
+    .adm-topbar-badge { background: rgba(255,255,255,.12); border-radius: 5px; font-size: 11px; font-weight: 600; padding: 2px 7px; letter-spacing: .5px; text-transform: uppercase; }
+    .adm-topbar-spacer { flex: 1; }
+    .adm-topbar-logout { font-size: 13px; color: rgba(255,255,255,.65); text-decoration: none; display: flex; align-items: center; gap: 5px; transition: color .15s; }
+    .adm-topbar-logout:hover { color: #fff; }
+
+    /* Tab nav */
+    .adm-tabs {
+      background: #fff; border-bottom: 1px solid #E2E8F0;
+      display: flex; padding: 0 24px; gap: 0;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .adm-tab {
+      display: flex; align-items: center; gap: 6px;
+      padding: 14px 18px; font-size: 14px; font-weight: 600;
+      color: #64748B; text-decoration: none; border-bottom: 2px solid transparent;
+      white-space: nowrap; transition: color .15s, border-color .15s;
+    }
+    .adm-tab:hover { color: var(--stone-dark); }
+    .adm-tab.active { color: var(--rose); border-bottom-color: var(--rose); }
+    .adm-tab-count {
+      background: #F1F5F9; color: #64748B; border-radius: 100px;
+      font-size: 11px; font-weight: 700; padding: 1px 7px; min-width: 20px; text-align: center;
+    }
+    .adm-tab.active .adm-tab-count { background: var(--rose-100); color: var(--rose); }
+
+    /* Page body */
+    .adm-body { max-width: 1280px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    /* Section header */
+    .adm-section-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+    .adm-section-title { font-size: 20px; font-weight: 800; color: #0F172A; margin: 0; font-family: var(--font-sans); }
+    .adm-section-spacer { flex: 1; }
+
+    /* Stat cards */
+    .adm-stats { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .adm-stat {
+      background: #fff; border-radius: 12px; padding: 18px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07); flex: 1; min-width: 140px;
+    }
+    .adm-stat-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: #94A3B8; margin-bottom: 6px; }
+    .adm-stat-value { font-size: 28px; font-weight: 800; color: #0F172A; line-height: 1; font-family: var(--font-sans); }
+    .adm-stat-value.green { color: #16A34A; }
+    .adm-stat-value.rose  { color: var(--rose); }
+
+    /* Search bar */
+    .adm-search {
+      display: flex; align-items: center; gap: 8px;
+      background: #fff; border: 1.5px solid #E2E8F0; border-radius: 10px;
+      padding: 8px 14px; min-width: 240px;
+    }
+    .adm-search input {
+      border: none; outline: none; font-family: var(--font-sans); font-size: 14px; color: #0F172A; width: 100%; background: transparent;
+    }
+    .adm-search svg { color: #94A3B8; flex-shrink: 0; }
+
+    /* Export button */
+    .adm-export {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #F8FAFC; border: 1.5px solid #E2E8F0; border-radius: 8px;
+      padding: 8px 14px; font-size: 13px; font-weight: 600; color: #334155;
+      text-decoration: none; cursor: pointer; transition: background .15s;
+      white-space: nowrap;
+    }
+    .adm-export:hover { background: #E2E8F0; }
+
+    /* Table */
+    .adm-table-wrap { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); overflow: hidden; }
+    .adm-table { width: 100%; border-collapse: collapse; }
+    .adm-table thead th {
+      background: #F8FAFC; color: #64748B; font-size: 11px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .6px; padding: 12px 16px;
+      text-align: left; border-bottom: 1px solid #E2E8F0; white-space: nowrap;
+      font-family: var(--font-sans);
+    }
+    .adm-table tbody tr { border-bottom: 1px solid #F1F5F9; transition: background .1s; }
+    .adm-table tbody tr:last-child { border-bottom: none; }
+    .adm-table tbody tr:hover { background: #F8FAFC; }
+    .adm-table tbody td { padding: 13px 16px; font-size: 14px; color: #334155; vertical-align: middle; }
+    .adm-table .mono { font-family: 'Courier New', monospace; font-size: 12px; color: #64748B; }
+    .adm-empty { text-align: center; padding: 60px 20px; color: #94A3B8; font-size: 15px; }
+
+    /* Badges */
+    .badge { display: inline-flex; align-items: center; gap: 4px; border-radius: 100px; font-size: 11px; font-weight: 700; padding: 3px 10px; text-transform: uppercase; letter-spacing: .4px; }
+    .badge-green  { background: #DCFCE7; color: #15803D; }
+    .badge-yellow { background: #FEF9C3; color: #92400E; }
+    .badge-red    { background: #FFE4E6; color: #9F1239; }
+    .badge-grey   { background: #F1F5F9; color: #64748B; }
+    .badge-blue   { background: #EFF6FF; color: #1D4ED8; }
+
+    @media (max-width: 700px) {
+      .adm-body { padding: 16px 12px 40px; }
+      .adm-tab  { padding: 12px 12px; font-size: 13px; }
+      .adm-table-wrap { overflow-x: auto; }
+      .adm-section-header { gap: 10px; }
+      .hide-mobile { display: none; }
+      .adm-search { min-width: 0; flex: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="adm-topbar">
+  <div class="adm-topbar-logo">
+    <div class="adm-topbar-logo-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+    </div>
+    e-healthwatch
+  </div>
+  <span class="adm-topbar-badge">Admin</span>
+  <div class="adm-topbar-spacer"></div>
+  <a href="/admin/logout" class="adm-topbar-logout">
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    Logout
+  </a>
+</div>
+
+<!-- Tab nav -->
+<div class="adm-tabs">
+  <a href="/admin/users"   class="adm-tab <%= locals.activeTab === 'users'   ? 'active' : '' %>">
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Users <span class="adm-tab-count"><%= locals.userCount || 0 %></span>
+  </a>
+  <a href="/admin/orders"  class="adm-tab <%= locals.activeTab === 'orders'  ? 'active' : '' %>">
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+    Orders <span class="adm-tab-count"><%= locals.orderCount || 0 %></span>
+  </a>
+  <a href="/admin/results" class="adm-tab <%= locals.activeTab === 'results' ? 'active' : '' %>">
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Results <span class="adm-tab-count"><%= locals.resultCount || 0 %></span>
+  </a>
+  <a href="/admin/bmd"     class="adm-tab <%= locals.activeTab === 'bmd'     ? 'active' : '' %>">
+    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+    BMD Records <span class="adm-tab-count"><%= locals.bmdCount || 0 %></span>
+  </a>
+</div>

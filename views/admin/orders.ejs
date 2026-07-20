@@ -1,0 +1,99 @@
+<%- include('partials/header', {
+  pageTitle: 'Orders',
+  activeTab: 'orders',
+  userCount: locals.userCount || 0,
+  orderCount: orders.length,
+  resultCount: locals.resultCount || 0,
+  bmdCount: locals.bmdCount || 0
+}) %>
+
+<div class="adm-body">
+
+  <div class="adm-stats">
+    <div class="adm-stat">
+      <div class="adm-stat-label">Total Orders</div>
+      <div class="adm-stat-value"><%= totalOrders %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Paid Orders</div>
+      <div class="adm-stat-value green"><%= paidOrders %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Total Revenue</div>
+      <div class="adm-stat-value green">₹<%= (paidRevenuePaise / 100).toFixed(0) %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Pending</div>
+      <div class="adm-stat-value"><%= totalOrders - paidOrders %></div>
+    </div>
+  </div>
+
+  <div class="adm-section-header">
+    <h1 class="adm-section-title">Orders</h1>
+    <div class="adm-section-spacer"></div>
+    <div class="adm-search">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="Search name, email or order ID…" oninput="filterTable()" autocomplete="off">
+    </div>
+    <a href="/admin/orders?export=csv" class="adm-export">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </a>
+  </div>
+
+  <div class="adm-table-wrap">
+    <table class="adm-table" id="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Consumer</th>
+          <th>Profile</th>
+          <th>Amount</th>
+          <th>Status</th>
+          <th class="hide-mobile">Gateway Order ID</th>
+          <th class="hide-mobile">Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (orders.length === 0) { %>
+          <tr><td colspan="7" class="adm-empty">No orders yet.</td></tr>
+        <% } %>
+        <% orders.forEach(function(o) { %>
+        <tr>
+          <td class="mono"><%= o.id %></td>
+          <td>
+            <strong><%= o.consumer_name || '—' %></strong><br>
+            <span style="font-size:12px;color:#94A3B8;"><%= o.consumer_email %></span>
+          </td>
+          <td><%= o.profile_name || '—' %></td>
+          <td>₹<%= (o.amount_paise / 100).toFixed(0) %></td>
+          <td>
+            <% if (o.status === 'paid') { %>
+              <span class="badge badge-green">✓ Paid</span>
+            <% } else if (o.status === 'created') { %>
+              <span class="badge badge-yellow">Pending</span>
+            <% } else { %>
+              <span class="badge badge-grey"><%= o.status %></span>
+            <% } %>
+          </td>
+          <td class="mono hide-mobile" style="font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <%= o.gateway_order_id || '—' %>
+          </td>
+          <td class="mono hide-mobile"><%= o.paid_at ? o.paid_at.slice(0,16).replace('T',' ') : (o.created_at ? o.created_at.slice(0,16).replace('T',' ') : '—') %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function filterTable() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  document.querySelectorAll('#data-table tbody tr').forEach(function(row) {
+    row.style.display = row.textContent.toLowerCase().indexOf(q) > -1 ? '' : 'none';
+  });
+}
+</script>
+
+<%- include('partials/footer') %>

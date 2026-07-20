@@ -73,6 +73,11 @@ db.exec(`
   );
 `);
 
+// Add email_verified column if it doesn't exist yet (safe for both fresh and existing DBs)
+try { db.exec("ALTER TABLE consumers ADD COLUMN email_verified INTEGER DEFAULT 0"); } catch (_) {}
+try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token TEXT"); } catch (_) {}
+try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token_expires DATETIME"); } catch (_) {}
+
 // Seed a default user if none exists
 const existing = db.prepare("SELECT COUNT(*) as cnt FROM bmdlogin").get();
 if (existing.cnt === 0) {

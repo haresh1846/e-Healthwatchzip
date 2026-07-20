@@ -610,6 +610,227 @@ app.get('/logout.asp', (req, res) => {
   res.redirect('/bmdlogin.asp');
 });
 
+// ─── Admin Panel ─────────────────────────────────────────────────────────────
+
+// Middleware: require admin session
+function requireAdmin(req, res, next) {
+  if (!req.session.adminLoggedIn) {
+    return res.redirect('/admin/login');
+  }
+  next();
+}
+
+// Helper: escape a single CSV cell value
+function csvCell(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+// Helper: render CSV from array of objects with given column keys
+function sendCsv(res, filename, columns, rows) {
+  const header = columns.map(c => csvCell(c.label)).join(',');
+  const body   = rows.map(r => columns.map(c => csvCell(r[c.key])).join(',')).join('\n');
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  res.send(header + '\n' + body);
+}
+
+// GET /admin  → redirect to users
+app.get('/admin', requireAdmin, (req, res) => res.redirect('/admin/users'));
+
+// GET /admin/login
+app.get('/admin/login', (req, res) => {
+  if (req.session.adminLoggedIn) return res.redirect('/admin/users');
+  res.render('admin/login', { error: null });
+});
+
+// POST /admin/login
+app.post('/admin/login', (req, res) => {
+  const { password } = req.body;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  if (!adminPassword) {
+    // ADMIN_PASSWORD secret not set — refuse login rather than accepting any password
+    return res.render('admin/login', { error: 'Admin access is not configured on this server.' });
+  }
+
+  // Constant-time comparison to prevent timing attacks
+  let match = false;
+  try {
+    const a = Buffer.from(password || '');
+    const b = Buffer.from(adminPassword);
+    if (a.length === b.length) {
+      match = crypto.timingSafeEqual(a, b);
+    }
+  } catch (_) {
+    match = false;
+  }
+
+  if (!match) {
+    return res.render('admin/login', { error: 'Incorrect password. Please try again.' });
+  }
+
+  req.session.adminLoggedIn = true;
+  res.redirect('/admin/users');
+});
+
+// GET /admin/logout
+app.get('/admin/logout', (req, res) => {
+  req.session.adminLoggedIn = false;
+  res.redirect('/admin/login');
+});
+
+// Shared counts helper (used in tab badges across all pages)
+function getTabCounts() {
+  return {
+    userCount:   (db.prepare('SELECT COUNT(*) as c FROM consumers').get() || {}).c || 0,
+    orderCount:  (db.prepare('SELECT COUNT(*) as c FROM consumer_orders').get() || {}).c || 0,
+    resultCount: (db.prepare('SELECT COUNT(*) as c FROM mp_results_v2').get() || {}).c || 0,
+    bmdCount:    (db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
+  };
+}
+
+// GET /admin/users
+app.get('/admin/users', requireAdmin, (req, res) => {
+  const users = db.prepare(`
+    SELECT c.id, c.email, c.full_name, c.email_verified, c.created_at,
+           COUNT(p.id) as profile_count
+    FROM consumers c
+    LEFT JOIN consumer_profiles p ON p.consumer_id = c.id
+    GROUP BY c.id
+    ORDER BY c.id DESC
+  `).all();
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'users.csv', [
+      { key: 'id',            label: 'ID' },
+      { key: 'full_name',     label: 'Name' },
+      { key: 'email',         label: 'Email' },
+      { key: 'email_verified',label: 'Email Verified' },
+      { key: 'profile_count', label: 'Profiles' },
+      { key: 'created_at',    label: 'Joined' },
+    ], users);
+  }
+
+  const verifiedUsers = users.filter(u => u.email_verified).length;
+  res.render('admin/users', {
+    users,
+    totalUsers: users.length,
+    verifiedUsers,
+    ...getTabCounts(),
+  });
+});
+
+// GET /admin/orders
+app.get('/admin/orders', requireAdmin, (req, res) => {
+  const orders = db.prepare(`
+    SELECT o.id, o.amount_paise, o.status, o.gateway_order_id, o.gateway_payment_id,
+           o.created_at, o.paid_at,
+           c.full_name as consumer_name, c.email as consumer_email,
+           p.display_name as profile_name
+    FROM consumer_orders o
+    LEFT JOIN consumers c ON c.id = o.consumer_id
+    LEFT JOIN consumer_profiles p ON p.id = o.profile_id
+    ORDER BY o.id DESC
+  `).all();
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'orders.csv', [
+      { key: 'id',               label: 'Order ID' },
+      { key: 'consumer_name',    label: 'Consumer Name' },
+      { key: 'consumer_email',   label: 'Consumer Email' },
+      { key: 'profile_name',     label: 'Profile' },
+      { key: 'amount_paise',     label: 'Amount (paise)' },
+      { key: 'status',           label: 'Status' },
+      { key: 'gateway_order_id', label: 'Gateway Order ID' },
+      { key: 'paid_at',          label: 'Paid At' },
+      { key: 'created_at',       label: 'Created At' },
+    ], orders);
+  }
+
+  const paidOrders       = orders.filter(o => o.status === 'paid').length;
+  const paidRevenuePaise = orders.filter(o => o.status === 'paid').reduce((sum, o) => sum + (o.amount_paise || 0), 0);
+
+  res.render('admin/orders', {
+    orders,
+    totalOrders: orders.length,
+    paidOrders,
+    paidRevenuePaise,
+    ...getTabCounts(),
+  });
+});
+
+// GET /admin/results
+app.get('/admin/results', requireAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT r.id, r.input_json, r.result_json, r.created_at,
+           c.full_name as consumer_name, c.email as consumer_email,
+           p.display_name as profile_name
+    FROM mp_results_v2 r
+    LEFT JOIN consumer_profiles p ON p.id = r.profile_id
+    LEFT JOIN consumers c ON c.id = p.consumer_id
+    ORDER BY r.id DESC
+  `).all();
+
+  // Parse JSON columns server-side — never expose raw JSON to the template
+  const results = rows.map(r => {
+    let input = {}, result = {};
+    try { input  = JSON.parse(r.input_json  || '{}'); } catch (_) {}
+    try { result = JSON.parse(r.result_json || '{}'); } catch (_) {}
+    return {
+      id:              r.id,
+      consumer_name:   r.consumer_name,
+      consumer_email:  r.consumer_email,
+      profile_name:    r.profile_name,
+      input_age:       input.age,
+      input_amh:       input.amh,
+      input_periods:   input.periods,
+      forecast_age:    result.forecastAge,
+      created_at:      r.created_at,
+    };
+  });
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'results.csv', [
+      { key: 'id',             label: 'Result ID' },
+      { key: 'consumer_name',  label: 'Consumer Name' },
+      { key: 'consumer_email', label: 'Consumer Email' },
+      { key: 'profile_name',   label: 'Profile' },
+      { key: 'input_age',      label: 'Age at Test' },
+      { key: 'input_amh',      label: 'AMH (ng/mL)' },
+      { key: 'input_periods',  label: 'Cycle Type' },
+      { key: 'forecast_age',   label: 'Forecast Menopause Age' },
+      { key: 'created_at',     label: 'Test Date' },
+    ], results);
+  }
+
+  res.render('admin/results', { results, ...getTabCounts() });
+});
+
+// GET /admin/bmd
+app.get('/admin/bmd', requireAdmin, (req, res) => {
+  const records = db.prepare('SELECT * FROM bmd ORDER BY id DESC').all();
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'bmd-records.csv', [
+      { key: 'id',     label: 'ID' },
+      { key: 'name',   label: 'Patient Name' },
+      { key: 'age',    label: 'Age' },
+      { key: 'height', label: 'Height (cm)' },
+      { key: 'weight', label: 'Weight (kg)' },
+      { key: 'hal',    label: 'HAL' },
+      { key: 'nsa',    label: 'NSA (degrees)' },
+      { key: 'guid',   label: 'Session ID' },
+    ], records);
+  }
+
+  res.render('admin/bmd', { records, ...getTabCounts() });
+});
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`e-healthwatch running on port ${PORT}`);

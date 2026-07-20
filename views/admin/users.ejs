@@ -1,0 +1,86 @@
+<%- include('partials/header', {
+  pageTitle: 'Users',
+  activeTab: 'users',
+  userCount: users.length,
+  orderCount: locals.orderCount || 0,
+  resultCount: locals.resultCount || 0,
+  bmdCount: locals.bmdCount || 0
+}) %>
+
+<div class="adm-body">
+
+  <div class="adm-stats">
+    <div class="adm-stat">
+      <div class="adm-stat-label">Total Users</div>
+      <div class="adm-stat-value"><%= totalUsers %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Verified</div>
+      <div class="adm-stat-value green"><%= verifiedUsers %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Unverified</div>
+      <div class="adm-stat-value rose"><%= totalUsers - verifiedUsers %></div>
+    </div>
+  </div>
+
+  <div class="adm-section-header">
+    <h1 class="adm-section-title">Users</h1>
+    <div class="adm-section-spacer"></div>
+    <div class="adm-search">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="Search name or email…" oninput="filterTable()" autocomplete="off">
+    </div>
+    <a href="/admin/users?export=csv" class="adm-export">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </a>
+  </div>
+
+  <div class="adm-table-wrap">
+    <table class="adm-table" id="data-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Verified</th>
+          <th>Profiles</th>
+          <th class="hide-mobile">Joined</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (users.length === 0) { %>
+          <tr><td colspan="6" class="adm-empty">No users yet.</td></tr>
+        <% } %>
+        <% users.forEach(function(u) { %>
+        <tr>
+          <td class="mono"><%= u.id %></td>
+          <td><strong><%= u.full_name || '—' %></strong></td>
+          <td><%= u.email %></td>
+          <td>
+            <% if (u.email_verified) { %>
+              <span class="badge badge-green">✓ Verified</span>
+            <% } else { %>
+              <span class="badge badge-yellow">Unverified</span>
+            <% } %>
+          </td>
+          <td><%= u.profile_count %></td>
+          <td class="mono hide-mobile"><%= u.created_at ? u.created_at.slice(0,16).replace('T',' ') : '—' %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+function filterTable() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  document.querySelectorAll('#data-table tbody tr').forEach(function(row) {
+    row.style.display = row.textContent.toLowerCase().indexOf(q) > -1 ? '' : 'none';
+  });
+}
+</script>
+
+<%- include('partials/footer') %>

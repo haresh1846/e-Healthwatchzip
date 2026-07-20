@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Login — e-healthwatch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/css/custom.css">
+  <style>
+    body { background: #F1F5F9; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .adm-login-card {
+      background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.10);
+      padding: 48px 40px; width: 100%; max-width: 380px;
+    }
+    .adm-login-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+    .adm-login-logo-icon { background: var(--rose); color: #fff; border-radius: 10px; width: 36px; height: 36px; display:flex; align-items:center; justify-content:center; }
+    .adm-login-logo-text { font-family: var(--font-sans); font-weight: 700; font-size: 18px; color: var(--stone-dark); }
+    .adm-login-title { font-family: var(--font-sans); font-size: 22px; font-weight: 700; color: var(--stone-dark); margin-bottom: 6px; }
+    .adm-login-sub   { font-size: 13px; color: var(--stone); margin-bottom: 28px; }
+    .adm-field label { display: block; font-size: 13px; font-weight: 600; color: var(--stone-dark); margin-bottom: 6px; }
+    .adm-field input {
+      width: 100%; padding: 12px 16px; border: 1.5px solid var(--stone-200); border-radius: 10px;
+      font-family: var(--font-sans); font-size: 15px; color: var(--stone-dark);
+      background: var(--stone-50); outline: none; transition: border-color .2s;
+    }
+    .adm-field input:focus { border-color: var(--rose); }
+    .adm-btn {
+      width: 100%; padding: 13px; background: var(--rose); color: #fff; border: none;
+      border-radius: 10px; font-family: var(--font-sans); font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 20px; transition: background .2s;
+    }
+    .adm-btn:hover { background: var(--rose-dark); }
+    .adm-error { background: #FFF1F2; border: 1px solid #FECDD3; color: #9f1239; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 18px; }
+  </style>
+</head>
+<body>
+  <div class="adm-login-card">
+    <div class="adm-login-logo">
+      <div class="adm-login-logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+      </div>
+      <span class="adm-login-logo-text">e-healthwatch</span>
+    </div>
+    <div class="adm-login-title">Admin Panel</div>
+    <div class="adm-login-sub">Sign in to view users, orders and results.</div>
+
+    <% if (locals.error) { %>
+      <div class="adm-error"><%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/admin/login">
+      <div class="adm-field" style="margin-bottom:0">
+        <label for="password">Admin Password</label>
+        <input type="password" id="password" name="password" placeholder="Enter password" required autofocus>
+      </div>
+      <button type="submit" class="adm-btn">Sign In →</button>
+    </form>
+  </div>
+</body>
+</html>
