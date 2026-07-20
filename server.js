@@ -131,6 +131,7 @@ app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), (req, r
         "UPDATE consumer_orders SET status = 'paid', gateway_payment_id = ?, paid_at = CURRENT_TIMESTAMP WHERE id = ?"
       ).run(paymentId, orderRow.id);
       console.log('[Razorpay webhook] Order marked paid via webhook:', orderId);
+      sendReceiptEmail(orderRow.id);
     } else {
       console.log('[Razorpay webhook] Order already paid, skipping update:', orderId);
     }
@@ -747,6 +748,50 @@ app.post('/login', async (req, res) => {
   }
 });
 
+// Payment receipt, sent once when an order transitions to paid (from either
+// the browser verify path or the webhook — whichever gets there first).
+async function sendReceiptEmail(orderId) {
+  try {
+    const o = db.prepare(`
+      SELECT o.id, o.amount_paise, o.gateway_payment_id, o.paid_at,
+             c.email, c.full_name, p.display_name AS profile_name
+      FROM consumer_orders o
+      JOIN consumers c ON c.id = o.consumer_id
+      JOIN consumer_profiles p ON p.id = o.profile_id
+      WHERE o.id = ?
+    `).get(orderId);
+    if (!o) return;
+    const transporter = createMailTransporter();
+    if (!transporter) {
+      console.warn('[receipt] Email not configured — receipt not sent for order', orderId);
+      return;
+    }
+    await transporter.sendMail({
+      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      to:      o.email,
+      subject: `Payment receipt — Order #${o.id} — e-healthwatch`,
+      text: [
+        `Hello${o.full_name ? ' ' + o.full_name : ''},`,
+        ``,
+        `Thank you for your payment. Here is your receipt:`,
+        ``,
+        `Order number:  #${o.id}`,
+        `Product:       Menopause Forecast (profile: ${o.profile_name})`,
+        `Amount paid:   ₹${(o.amount_paise / 100).toFixed(2)}`,
+        `Payment ID:    ${o.gateway_payment_id || '—'}`,
+        `Date:          ${o.paid_at || new Date().toISOString()}`,
+        ``,
+        `Your result is stored permanently on your profile — sign in at any time to view it or download the report.`,
+        ``,
+        `— e-healthwatch`,
+      ].join('\n'),
+    });
+    console.log('[receipt] Receipt emailed for order', orderId);
+  } catch (err) {
+    console.error('[receipt] Failed to send receipt for order', orderId, ':', err.message);
+  }
+}
+
 // ─── Password reset ──────────────────────────────────────────────────────────
 
 async function sendPasswordResetEmail(req, consumer) {
@@ -1128,7 +1173,23 @@ app.post('/forecast/:profileId/verify', requireConsumer, (req, res) => {
 
   // Clear pending forecast from session
   req.session.pendingForecast = null;
+  sendReceiptEmail(orderRow.id);
   res.redirect('/my-result/' + profile.id);
+});
+
+// Consumer order history
+app.get('/orders', requireConsumer, (req, res) => {
+  const orders = db.prepare(`
+    SELECT o.id, o.amount_paise, o.status, o.gateway_payment_id, o.created_at, o.paid_at,
+           p.id AS profile_id, p.display_name AS profile_name,
+           r.id AS result_id
+    FROM consumer_orders o
+    JOIN consumer_profiles p ON p.id = o.profile_id
+    LEFT JOIN mp_results_v2 r ON r.order_id = o.id
+    WHERE o.consumer_id = ?
+    ORDER BY o.id DESC
+  `).all(req.session.consumerId);
+  res.render('orders', { orders });
 });
 
 // View stored result (always free after paying once)
