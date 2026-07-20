@@ -777,6 +777,7 @@ function getTabCounts() {
     orderCount:  (db.prepare('SELECT COUNT(*) as c FROM consumer_orders').get() || {}).c || 0,
     resultCount: (db.prepare('SELECT COUNT(*) as c FROM mp_results_v2').get() || {}).c || 0,
     bmdCount:    (db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
+    clinicCount: (db.prepare('SELECT COUNT(*) as c FROM bmdlogin').get() || {}).c || 0,
   };
 }
 
@@ -915,6 +916,81 @@ app.get('/admin/bmd', requireAdmin, (req, res) => {
   }
 
   res.render('admin/bmd', { records, ...getTabCounts() });
+});
+
+// GET /admin/clinic
+app.get('/admin/clinic', requireAdmin, (req, res) => {
+  const rows = db.prepare('SELECT id, username, expirydate, limitavailable, pwd FROM bmdlogin ORDER BY id').all();
+
+  const accounts = rows.map(r => ({
+    ...r,
+    // Expose whether this account still has the known-insecure default credentials
+    isDefault: r.username === 'admin' && r.pwd === 'admin123',
+    // Strip pwd from the object passed to the template — never render passwords
+    pwd: undefined,
+  }));
+
+  const hasDefaultCredentials = accounts.some(a => a.isDefault);
+
+  res.render('admin/clinic', {
+    accounts,
+    hasDefaultCredentials,
+    flash: req.session.clinicFlash || null,
+    ...getTabCounts(),
+  });
+  req.session.clinicFlash = null;
+});
+
+// POST /admin/clinic/:username/password
+app.post('/admin/clinic/:username/password', requireAdmin, (req, res) => {
+  const { username } = req.params;
+  const { new_password } = req.body;
+
+  if (!new_password || new_password.length < 4) {
+    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 4 characters.' };
+    return res.redirect('/admin/clinic');
+  }
+
+  const account = db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
+  if (!account) {
+    req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
+    return res.redirect('/admin/clinic');
+  }
+
+  db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(new_password, username);
+  console.log(`[Admin] Password updated for clinic account: ${username}`);
+  req.session.clinicFlash = { type: 'success', message: `Password for "${username}" updated successfully.` };
+  res.redirect('/admin/clinic');
+});
+
+// POST /admin/clinic/:username/settings
+app.post('/admin/clinic/:username/settings', requireAdmin, (req, res) => {
+  const { username } = req.params;
+  const { expirydate, limitavailable } = req.body;
+
+  const limit = parseInt(limitavailable, 10);
+  if (isNaN(limit) || limit < 0) {
+    req.session.clinicFlash = { type: 'error', message: 'Scan limit must be a non-negative whole number.' };
+    return res.redirect('/admin/clinic');
+  }
+
+  // Validate date format (YYYY-MM-DD) if provided
+  if (expirydate && !/^\d{4}-\d{2}-\d{2}$/.test(expirydate)) {
+    req.session.clinicFlash = { type: 'error', message: 'Expiry date must be in YYYY-MM-DD format.' };
+    return res.redirect('/admin/clinic');
+  }
+
+  const account = db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
+  if (!account) {
+    req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
+    return res.redirect('/admin/clinic');
+  }
+
+  db.prepare('UPDATE bmdlogin SET expirydate = ?, limitavailable = ? WHERE username = ?')
+    .run(expirydate || null, limit, username);
+  console.log(`[Admin] Settings updated for clinic account: ${username} (expiry=${expirydate}, limit=${limit})`);
+  req.session.clinicFlash = { type: 'success', message: `Settings for "${username}" saved.` };
+  res.redirect('/admin/clinic');
 });
 
 // ─── Start ───────────────────────────────────────────────────────────────────
