@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "T3_I16J9T_RATJ2SrcKqo"
+uri = "file://public/css/custom.css"
+type = "unspecified"
+title = "custom.css — Warm Wellness Design System"
