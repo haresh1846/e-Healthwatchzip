@@ -17,6 +17,7 @@
       <% } %>
 
       <form method="POST" action="/profile/new" class="auth-form">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="auth-field">
           <label for="display_name">Name</label>
           <input type="text" id="display_name" name="display_name" required placeholder="e.g. Priya, Mum, Anita" class="form-control">

@@ -172,6 +172,37 @@ app.use((req, res, next) => {
   next();
 });
 
+// ─── CSRF protection ─────────────────────────────────────────────────────────
+// Every session gets a random token, exposed to all templates as csrfToken.
+// Every POST must echo it back in a hidden `_csrf` field. The Razorpay
+// webhook is unaffected: it is registered before the session middleware and
+// authenticates with an HMAC signature over the raw body instead.
+app.use((req, res, next) => {
+  if (!req.session.csrfToken) {
+    req.session.csrfToken = crypto.randomBytes(24).toString('hex');
+  }
+  res.locals.csrfToken = req.session.csrfToken;
+  next();
+});
+
+app.use((req, res, next) => {
+  if (req.method !== 'POST') return next();
+  const submitted = (req.body && req.body._csrf) || req.headers['x-csrf-token'] || '';
+  let valid = false;
+  try {
+    const a = Buffer.from(String(submitted));
+    const b = Buffer.from(req.session.csrfToken || '');
+    valid = a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch (_) {
+    valid = false;
+  }
+  if (!valid) {
+    console.warn('[CSRF] Rejected POST to', req.path);
+    return res.status(403).send('Invalid or missing security token. Please go back, refresh the page, and try again.');
+  }
+  next();
+});
+
 // Consumer auth guard
 function requireConsumer(req, res, next) {
   if (!req.session.consumerId) {

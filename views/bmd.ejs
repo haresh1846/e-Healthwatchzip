@@ -76,6 +76,7 @@ function calcfm() {
       </div>
       <% } %>
       <form name="frm_salableitems" method="post" action="/bmdsave.asp">
+  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
         <div class="col-lg-4 col-md-4 col-sm-4 col-xs-12">
           <h2 class="aboutpage-title">&nbsp;</h2>
           <div class="aboutpage-content">
