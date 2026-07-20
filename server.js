@@ -1650,6 +1650,71 @@ app.post('/admin/clinic/:username/settings', requireAdmin, async (req, res) => {
   res.redirect('/admin/clinic');
 });
 
+// GET /admin/analytics — marketing funnel, daily trend, and revenue metrics
+app.get('/admin/analytics', requireAdmin, async (req, res) => {
+  const one = async (sql, ...args) => ((await db.prepare(sql).get(...args)) || {}).c || 0;
+
+  const totalUsers       = await one('SELECT COUNT(*) AS c FROM consumers');
+  const verifiedUsers    = await one('SELECT COUNT(*) AS c FROM consumers WHERE email_verified = 1');
+  const usersWithProfile = await one('SELECT COUNT(DISTINCT consumer_id) AS c FROM consumer_profiles');
+  const usersWithOrder   = await one('SELECT COUNT(DISTINCT consumer_id) AS c FROM consumer_orders');
+  const usersPaid        = await one("SELECT COUNT(DISTINCT consumer_id) AS c FROM consumer_orders WHERE status = 'paid'");
+  const ordersPaid       = await one("SELECT COUNT(*) AS c FROM consumer_orders WHERE status = 'paid'");
+  const revenuePaise     = await one("SELECT COALESCE(SUM(amount_paise),0) AS c FROM consumer_orders WHERE status = 'paid'");
+
+  // Funnel: each stage's conversion is measured against the previous stage
+  const stages = [
+    { stage: 'Signed up',                 count: totalUsers },
+    { stage: 'Created a profile',         count: usersWithProfile },
+    { stage: 'Started a test (order)',    count: usersWithOrder },
+    { stage: 'Paid ₹49',                  count: usersPaid },
+  ];
+  const funnel = stages.map((s, i) => ({
+    ...s,
+    pct: i === 0 ? 100 : (stages[i - 1].count ? Math.round((s.count / stages[i - 1].count) * 100) : 0),
+  }));
+
+  // Daily series, last 30 days (signups and orders merged by day)
+  const signupsByDay = await db.prepare(
+    "SELECT date(created_at) AS day, COUNT(*) AS signups FROM consumers WHERE created_at >= datetime('now','-30 day') GROUP BY day"
+  ).all();
+  const ordersByDay = await db.prepare(
+    "SELECT date(created_at) AS day, COUNT(*) AS orders, " +
+    "SUM(CASE WHEN status='paid' THEN 1 ELSE 0 END) AS paid, " +
+    "SUM(CASE WHEN status='paid' THEN amount_paise ELSE 0 END) AS revenue_paise " +
+    "FROM consumer_orders WHERE created_at >= datetime('now','-30 day') GROUP BY day"
+  ).all();
+
+  const byDay = new Map();
+  const rowFor = (day) => {
+    if (!byDay.has(day)) byDay.set(day, { day, signups: 0, orders: 0, paid: 0, revenue_paise: 0 });
+    return byDay.get(day);
+  };
+  for (const r of signupsByDay) rowFor(r.day).signups = r.signups;
+  for (const r of ordersByDay) Object.assign(rowFor(r.day), { orders: r.orders, paid: r.paid || 0, revenue_paise: r.revenue_paise || 0 });
+  const daily = [...byDay.values()].sort((a, b) => (a.day < b.day ? 1 : -1));
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'analytics-daily.csv', [
+      { key: 'day',           label: 'Date' },
+      { key: 'signups',       label: 'Signups' },
+      { key: 'orders',        label: 'Orders Created' },
+      { key: 'paid',          label: 'Orders Paid' },
+      { key: 'revenue_paise', label: 'Revenue (paise)' },
+    ], daily);
+  }
+
+  res.render('admin/analytics', {
+    funnel,
+    daily,
+    totalUsers,
+    verifiedUsers,
+    ordersPaid,
+    revenuePaise,
+    ...await getTabCounts(),
+  });
+});
+
 // ─── Start ───────────────────────────────────────────────────────────────────
 // Listen only when run directly (node server.js). On Vercel the app is
 // imported by api/index.js and invoked per-request instead.
