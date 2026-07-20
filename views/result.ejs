@@ -1,11 +1,5 @@
 <%- include('partials/header') %>
 
-<script>
-function back() {
-  window.location.href = '/bmd.asp';
-}
-</script>
-
 <!------ About Banner ------->
 <section id="banner-section">
   <div class="container-fluid">
@@ -21,13 +15,28 @@ function back() {
 <section id="about-cont">
   <div class="container">
     <div class="row">
-      <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
-        <h2 class="aboutpage-title">BMD result</h2>
+      <div class="col-lg-8 col-md-10 col-sm-12 col-xs-12" style="margin:0 auto;float:none;">
+        <h2 class="aboutpage-title">BMD result for <em><%= name %></em></h2>
         <div class="aboutpage-content">
-          <div class="form-group inner-tittle">
-            <label class="inner-tittle">Your Result &nbsp; <strong><%= result %></strong></label>
+
+          <div style="background:#F8FAFC;border:1.5px solid #E2E8F0;border-radius:12px;padding:24px 28px;margin-bottom:20px;">
+            <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:#94A3B8;margin-bottom:8px;">BMD Score</div>
+            <div style="font-size:40px;font-weight:900;color:#0F172A;font-family:monospace;line-height:1;"><%= result %></div>
           </div>
-          <button type="button" name="btn_enq" id="btn_enq" class="btn btn-warning submit-form" onclick="back()">Back</button>
+
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <a href="/bmd.asp"
+               style="display:inline-flex;align-items:center;gap:6px;background:var(--rose);color:#fff;padding:10px 20px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New Calculation
+            </a>
+            <a href="/bmd-history"
+               style="display:inline-flex;align-items:center;gap:6px;background:#F1F5F9;color:#334155;padding:10px 20px;border-radius:8px;font-weight:700;font-size:14px;text-decoration:none;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+              View History
+            </a>
+          </div>
+
         </div>
       </div>
     </div>

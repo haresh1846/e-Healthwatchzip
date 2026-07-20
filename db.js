@@ -79,6 +79,11 @@ try { db.exec("ALTER TABLE consumers ADD COLUMN email_verified INTEGER DEFAULT 0
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token TEXT"); } catch (_) {}
 try { db.exec("ALTER TABLE consumers ADD COLUMN verification_token_expires DATETIME"); } catch (_) {}
 
+// Add clinic_username and created_at to bmd table so records persist and can be
+// associated with the logged-in clinic account (safe no-op if columns already exist)
+try { db.exec("ALTER TABLE bmd ADD COLUMN clinic_username TEXT"); } catch (_) {}
+try { db.exec("ALTER TABLE bmd ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"); } catch (_) {}
+
 // Seed a default user if none exists — password stored as bcrypt hash from the start
 const existing = db.prepare("SELECT COUNT(*) as cnt FROM bmdlogin").get();
 if (existing.cnt === 0) {

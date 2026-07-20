@@ -318,8 +318,8 @@ app.post('/bmdsave.asp', (req, res) => {
   }
 
   db.prepare(
-    "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, guid);
+    "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid, clinic_username) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, guid, req.session.userid);
 
   db.prepare(
     "UPDATE bmdlogin SET limitavailable = limitavailable - 1 WHERE username = ?"
@@ -353,9 +353,30 @@ app.get('/result.asp', (req, res) => {
     Math.pow(nsa * 0.0174533, -0.239446)
   ).toFixed(4);
 
-  db.prepare("DELETE FROM bmd WHERE guid = ?").run(guid);
+  // Records are now kept permanently — no DELETE here.
+  // Clear the guid from the session so Back → /bmd.asp gets a fresh form.
+  req.session.guid = null;
 
-  res.render('result', { result, name: row.name });
+  res.render('result', { result, name: row.name, recordId: row.id });
+});
+
+// BMD History – all records for this clinic
+app.get('/bmd-history', (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  const records = db.prepare(
+    "SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC"
+  ).all(req.session.userid);
+  res.render('bmd-history', { records, clinicUser: req.session.userid, patientFilter: null });
+});
+
+// BMD History – per-patient view
+app.get('/bmd-patient/:name', (req, res) => {
+  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
+  const name = req.params.name;
+  const records = db.prepare(
+    "SELECT * FROM bmd WHERE clinic_username = ? AND LOWER(name) = LOWER(?) ORDER BY id DESC"
+  ).all(req.session.userid, name);
+  res.render('bmd-history', { records, clinicUser: req.session.userid, patientFilter: name });
 });
 
 // ─── Consumer Account Routes ─────────────────────────────────────────────────
