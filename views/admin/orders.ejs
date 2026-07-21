@@ -9,6 +9,12 @@
 
 <div class="adm-body">
 
+  <% if (locals.flash) { %>
+  <div style="background:<%= flash.type === 'success' ? '#DCFCE7' : '#FFE4E6' %>;border:1.5px solid <%= flash.type === 'success' ? '#BBF7D0' : '#FECDD3' %>;border-radius:10px;padding:12px 18px;margin-bottom:20px;font-size:14px;color:<%= flash.type === 'success' ? '#15803D' : '#9F1239' %>;">
+    <%= flash.message %>
+  </div>
+  <% } %>
+
   <div class="adm-stats">
     <div class="adm-stat">
       <div class="adm-stat-label">Total Orders</div>
@@ -52,11 +58,12 @@
           <th>Status</th>
           <th class="hide-mobile">Gateway Order ID</th>
           <th class="hide-mobile">Date</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
         <% if (orders.length === 0) { %>
-          <tr><td colspan="7" class="adm-empty">No orders yet.</td></tr>
+          <tr><td colspan="8" class="adm-empty">No orders yet.</td></tr>
         <% } %>
         <% orders.forEach(function(o) { %>
         <tr>
@@ -80,6 +87,16 @@
             <%= o.gateway_order_id || '—' %>
           </td>
           <td class="mono hide-mobile"><%= o.paid_at ? o.paid_at.slice(0,16).replace('T',' ') : (o.created_at ? o.created_at.slice(0,16).replace('T',' ') : '—') %></td>
+          <td>
+            <% if (o.status === 'paid') { %>
+            <form method="POST" action="/admin/orders/<%= o.id %>/resend-receipt" style="margin:0;" onsubmit="return confirm('Resend the payment receipt and PDF attachments for order #<%= o.id %> to <%= o.consumer_email %>?');">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button type="submit" style="padding:6px 12px;background:#1E293B;color:#fff;border:none;border-radius:7px;font-family:var(--font-sans);font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;">
+                Resend receipt
+              </button>
+            </form>
+            <% } %>
+          </td>
         </tr>
         <% }); %>
       </tbody>

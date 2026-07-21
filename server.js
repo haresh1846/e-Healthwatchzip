@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
+const { buildReceiptPdf, buildForecastReportPdf, computeForecastInterpretation } = require('./lib/pdf');
 const db = require('./db');
 const SqliteSessionStore = require('./session-store');
 
@@ -767,18 +768,59 @@ async function sendReceiptEmail(orderId) {
   try {
     const o = await db.prepare(`
       SELECT o.id, o.amount_paise, o.gateway_payment_id, o.paid_at,
-             c.email, c.full_name, p.display_name AS profile_name
+             c.email, c.full_name, p.display_name AS profile_name, p.relationship_label,
+             r.input_json, r.result_json, r.created_at AS result_created_at
       FROM consumer_orders o
       JOIN consumers c ON c.id = o.consumer_id
       JOIN consumer_profiles p ON p.id = o.profile_id
+      LEFT JOIN mp_results_v2 r ON r.order_id = o.id
       WHERE o.id = ?
     `).get(orderId);
     if (!o) return;
+
+    const dateFmt = { day: 'numeric', month: 'long', year: 'numeric' };
+    const amountInr = (o.amount_paise / 100).toFixed(2);
+    const paidAt = o.paid_at || new Date().toISOString();
+
+    // Two separate PDFs are attached: the payment receipt, and — when the
+    // forecast has been computed — the printable result report.
+    const attachments = [{
+      filename: `receipt-order-${o.id}.pdf`,
+      content: await buildReceiptPdf({
+        orderId: o.id,
+        profileName: o.profile_name,
+        amountInr,
+        paymentId: o.gateway_payment_id || '—',
+        paidAt,
+        consumerName: o.full_name,
+      }),
+    }];
+
+    if (o.result_json) {
+      const input = JSON.parse(o.input_json);
+      const result = JSON.parse(o.result_json);
+      const { yearsToOnset, interpNote } = computeForecastInterpretation(input, result);
+      attachments.push({
+        filename: `forecast-report-order-${o.id}.pdf`,
+        content: await buildForecastReportPdf({
+          profileName: o.profile_name,
+          relationshipLabel: o.relationship_label,
+          input, result, yearsToOnset, interpNote,
+          testDate:  new Date(o.result_created_at).toLocaleDateString('en-IN', dateFmt),
+          printDate: new Date().toLocaleDateString('en-IN', dateFmt),
+        }),
+      });
+    }
+
     const transporter = createMailTransporter();
     if (!transporter) {
-      console.warn('[receipt] Email not configured — receipt not sent for order', orderId);
+      console.warn(
+        '[receipt] Email not configured — receipt not sent for order', orderId,
+        '| would attach:', attachments.map(a => `${a.filename} (${a.content.length}b)`).join(', ')
+      );
       return;
     }
+
     await transporter.sendMail({
       from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
       to:      o.email,
@@ -786,20 +828,21 @@ async function sendReceiptEmail(orderId) {
       text: [
         `Hello${o.full_name ? ' ' + o.full_name : ''},`,
         ``,
-        `Thank you for your payment. Here is your receipt:`,
+        `Thank you for your payment. Your receipt${o.result_json ? ' and forecast report are attached as PDFs' : ' is attached as a PDF'}.`,
         ``,
         `Order number:  #${o.id}`,
         `Product:       Menopause Forecast (profile: ${o.profile_name})`,
-        `Amount paid:   ₹${(o.amount_paise / 100).toFixed(2)}`,
+        `Amount paid:   ₹${amountInr}`,
         `Payment ID:    ${o.gateway_payment_id || '—'}`,
-        `Date:          ${o.paid_at || new Date().toISOString()}`,
+        `Date:          ${paidAt}`,
         ``,
         `Your result is stored permanently on your profile — sign in at any time to view it or download the report.`,
         ``,
         `— e-healthwatch`,
       ].join('\n'),
+      attachments,
     });
-    console.log('[receipt] Receipt emailed for order', orderId);
+    console.log(`[receipt] Receipt + ${attachments.length} PDF(s) emailed for order`, orderId);
   } catch (err) {
     console.error('[receipt] Failed to send receipt for order', orderId, ':', err.message);
   }
@@ -1229,11 +1272,7 @@ app.get('/forecast-report/:profileId', requireConsumer, async (req, res) => {
 
   const input  = JSON.parse(row.input_json);
   const result = JSON.parse(row.result_json);
-  const yearsToOnset = result.forecastAge - parseInt(input.age, 10);
-  const interpNote =
-    yearsToOnset > 15 ? `Based on the AMH level of ${input.amh} ng/mL, ovarian reserve appears well-preserved, with an estimated ${yearsToOnset} years before natural menopause onset — well within the expected range for the current age.` :
-    yearsToOnset > 8  ? `The AMH level of ${input.amh} ng/mL suggests a typical ovarian reserve for this age. The estimated timeline of ${yearsToOnset} years to menopause is within the normal range.` :
-                        `The AMH level of ${input.amh} ng/mL suggests ovarian reserve may be lower than average for this age. We recommend discussing this result with a gynaecologist for a full clinical assessment.`;
+  const { yearsToOnset, interpNote } = computeForecastInterpretation(input, result);
 
   const dateFmt = { day: 'numeric', month: 'long', year: 'numeric' };
   res.render('forecast-report', {
@@ -1449,8 +1488,27 @@ app.get('/admin/orders', requireAdmin, async (req, res) => {
     totalOrders: orders.length,
     paidOrders,
     paidRevenuePaise,
+    flash: req.session.ordersFlash || null,
     ...await getTabCounts(),
   });
+  req.session.ordersFlash = null;
+});
+
+// POST /admin/orders/:id/resend-receipt — re-send the receipt + PDF
+// attachments for an already-paid order, without requiring a new payment.
+app.post('/admin/orders/:id/resend-receipt', requireAdmin, async (req, res) => {
+  const order = await db.prepare("SELECT id, status FROM consumer_orders WHERE id = ?").get(req.params.id);
+  if (!order) {
+    req.session.ordersFlash = { type: 'error', message: `Order #${req.params.id} not found.` };
+    return res.redirect('/admin/orders');
+  }
+  if (order.status !== 'paid') {
+    req.session.ordersFlash = { type: 'error', message: `Order #${order.id} has not been paid — nothing to resend.` };
+    return res.redirect('/admin/orders');
+  }
+  await sendReceiptEmail(order.id);
+  req.session.ordersFlash = { type: 'success', message: `Receipt (with PDF attachments) resent for order #${order.id}.` };
+  res.redirect('/admin/orders');
 });
 
 // GET /admin/results
