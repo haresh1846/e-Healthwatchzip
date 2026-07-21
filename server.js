@@ -490,9 +490,10 @@ app.get('/clinic-dashboard', requireClinic, async (req, res) => {
     'SELECT COUNT(*) as cnt FROM bmd WHERE clinic_username = ?'
   ).get(req.session.userid) || {}).cnt || 0;
 
-  const recent = await db.prepare(
+  const recentRows = await db.prepare(
     'SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC LIMIT 5'
-  ).all(req.session.userid).map(r => {
+  ).all(req.session.userid);
+  const recent = recentRows.map(r => {
     const h = parseFloat(r.height), w = parseFloat(r.weight);
     const a = parseFloat(r.age), hal = parseFloat(r.hal), nsa = parseFloat(r.nsa);
     let score = null;
@@ -945,12 +946,12 @@ app.get('/dashboard', requireConsumer, async (req, res) => {
 
 // New profile
 app.get('/profile/new', requireConsumer, async (req, res) => {
-  const count = await db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId).cnt;
+  const count = (await db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId)).cnt;
   if (count >= 3) return res.redirect('/dashboard');
   res.render('profile-new', { error: null });
 });
 app.post('/profile/new', requireConsumer, async (req, res) => {
-  const count = await db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId).cnt;
+  const count = (await db.prepare('SELECT COUNT(*) as cnt FROM consumer_profiles WHERE consumer_id = ?').get(req.session.consumerId)).cnt;
   if (count >= 3) return res.redirect('/dashboard');
   const { display_name, relationship_label, date_of_birth } = req.body;
   const r = await db.prepare('INSERT INTO consumer_profiles (consumer_id, display_name, relationship_label, date_of_birth) VALUES (?, ?, ?, ?)').run(req.session.consumerId, display_name, relationship_label || 'Self', date_of_birth || null);
