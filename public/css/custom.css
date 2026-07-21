@@ -57,6 +57,12 @@ h1, h2, h3, h4 { font-family: var(--font-serif); color: var(--stone-dark); line-
 .container   { max-width: 1170px; margin: 0 auto; padding: 0 20px; }
 .container-fluid { width: 100%; padding: 0 20px; }
 .row         { display: flex; flex-wrap: wrap; margin: 0 -15px; }
+/* A <form> wrapping the grid columns (bmdlogin.ejs, bmd.ejs) would otherwise
+   become the flex item itself, shrinking to fit its content instead of
+   letting the .col-* divs inside it size against .row — this makes the
+   form transparent to layout so its children behave as if they were direct
+   children of .row, without changing any markup. */
+.row > form  { display: contents; }
 [class*="col-"] { padding: 0 15px; flex: 1 1 auto; min-width: 0; }
 .col-xs-12, .col-sm-12, .col-md-12, .col-lg-12 { flex: 0 0 100%; max-width: 100%; }
 .col-xs-6,  .col-sm-6  { flex: 0 0 50%;     max-width: 50%; }
