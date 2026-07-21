@@ -2,7 +2,6 @@ const express = require('express');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
@@ -526,7 +525,7 @@ app.get('/clinic-dashboard', requireClinic, async (req, res) => {
 
 // BMD Calculator – GET (auth required)
 app.get('/bmd.asp', requireClinic, async (req, res) => {
-  req.session.guid = uuidv4();
+  req.session.guid = crypto.randomUUID();
   res.render('bmd', { bmdError: req.query.error || null });
 });
 
