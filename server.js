@@ -8,8 +8,15 @@ const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 const { buildReceiptPdf, buildForecastReportPdf, computeForecastInterpretation } = require('./lib/pdf');
 const { computeBmdResult } = require('./lib/bmd');
+const { formatOrderNumber } = require('./lib/order-number');
 const db = require('./db');
 const SqliteSessionStore = require('./session-store');
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
 
 // ─── Email transporter ────────────────────────────────────────────────────────
 // Lazily created so missing secrets don't crash startup; only contact form
@@ -538,6 +545,9 @@ async function sendReceiptEmail(orderId) {
     const dateFmt = { day: 'numeric', month: 'long', year: 'numeric' };
     const amountInr = (o.amount_paise / 100).toFixed(2);
     const paidAt = o.paid_at || new Date().toISOString();
+    const paidAtFmt = new Date(paidAt.replace(' ', 'T') + (paidAt.includes('Z') ? '' : 'Z'))
+      .toLocaleString('en-IN', { ...dateFmt, hour: 'numeric', minute: '2-digit' });
+    const orderNumber = formatOrderNumber(o.id);
 
     // Two separate PDFs are attached: the payment receipt, and — when the
     // forecast has been computed — the printable result report.
@@ -578,25 +588,46 @@ async function sendReceiptEmail(orderId) {
       return;
     }
 
+    const introLine = `Thank you for your payment. Your receipt${o.result_json ? ' and forecast report are attached as PDFs' : ' is attached as a PDF'}.`;
+    const fields = [
+      ['Order number', orderNumber],
+      ['Product', `Menopause Forecast (profile: ${o.profile_name})`],
+      ['Amount paid', `Rs. ${amountInr}`],
+      ['Payment ID', o.gateway_payment_id || '—'],
+      ['Date', paidAtFmt],
+    ];
+    const fieldLabelWidth = Math.max(...fields.map(([label]) => label.length)) + 1;
+
     await transporter.sendMail({
       from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
       to:      o.email,
-      subject: `Payment receipt — Order #${o.id} — e-healthwatch`,
+      subject: `Payment receipt — ${orderNumber} — e-healthwatch`,
       text: [
         `Hello${o.full_name ? ' ' + o.full_name : ''},`,
         ``,
-        `Thank you for your payment. Your receipt${o.result_json ? ' and forecast report are attached as PDFs' : ' is attached as a PDF'}.`,
+        introLine,
         ``,
-        `Order number:  #${o.id}`,
-        `Product:       Menopause Forecast (profile: ${o.profile_name})`,
-        `Amount paid:   ₹${amountInr}`,
-        `Payment ID:    ${o.gateway_payment_id || '—'}`,
-        `Date:          ${paidAt}`,
+        ...fields.map(([label, value]) => `${(label + ':').padEnd(fieldLabelWidth + 1)}${value}`),
         ``,
         `Your result is stored permanently on your profile — sign in at any time to view it or download the report.`,
         ``,
         `— e-healthwatch`,
       ].join('\n'),
+      html: `
+        <div style="font-family: Arial, Helvetica, sans-serif; color: #1E293B; max-width: 480px; margin: 0 auto;">
+          <p style="font-size: 15px; font-weight: bold; margin: 0 0 12px;">Hello${o.full_name ? ' ' + escapeHtml(o.full_name) : ''},</p>
+          <p style="font-size: 14px; color: #475569; margin: 0 0 20px;">${escapeHtml(introLine)}</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            ${fields.map(([label, value]) => `
+            <tr>
+              <td style="padding: 6px 16px 6px 0; font-size: 13px; color: #64748B; white-space: nowrap; vertical-align: top;">${escapeHtml(label)}</td>
+              <td style="padding: 6px 0; font-size: 13px; color: #1E293B; font-weight: bold;">${escapeHtml(value)}</td>
+            </tr>`).join('')}
+          </table>
+          <p style="font-size: 13px; color: #475569; margin: 0 0 20px;">Your result is stored permanently on your profile — sign in at any time to view it or download the report.</p>
+          <p style="font-size: 14px; color: #E11D48; font-weight: bold; margin: 0;">— e-healthwatch</p>
+        </div>
+      `,
       attachments,
     });
     console.log(`[receipt] Receipt + ${attachments.length} PDF(s) emailed for order`, orderId);
@@ -1004,7 +1035,7 @@ app.get('/orders', requireConsumer, async (req, res) => {
     WHERE o.consumer_id = ?
     ORDER BY o.id DESC
   `).all(req.session.consumerId);
-  res.render('orders', { orders });
+  res.render('orders', { orders, formatOrderNumber });
 });
 
 // View stored result (always free after paying once)
