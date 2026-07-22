@@ -5,12 +5,18 @@
  * isolated throwaway database via DB_PATH). Covers:
  *
  *  1. CSRF — POSTs without a token are rejected, with a token they succeed.
- *  2. Payment-gate regression — a logged-in consumer can NOT compute a
- *     forecast through the legacy POST /mpresult.asp; clinic sessions can.
- *  3. Forecast formula — the real handler computes round(b0 × AMH^b1) with
- *     the published coefficients for regular and irregular cycles.
- *  4. Default clinic credentials force a password change before any clinic
- *     page is usable.
+ *  2. /mpresult.asp is retired (404) — it only ever existed as a clinic-
+ *     session bypass around the forecast paywall, and clinic sessions no
+ *     longer exist now that BMD is a free public tool.
+ *  3. Public BMD calculator — works with no login, computes the published
+ *     formula/WHO classification correctly, the printable report is reachable
+ *     by its private guid (and a bogus guid is not), retired clinic URLs
+ *     redirect to /bmd.asp instead of 404ing, and the calculator's own rate
+ *     limit trips after the cap.
+ *  4. Historical-data protection — a plain-text bmdlogin password (from
+ *     before the bcrypt migration, or before BMD went login-free) is hashed
+ *     by db.js's startup migration, without needing a login route to trigger
+ *     it — the migration itself is unconditional.
  *  5. Password reset — emailed link works once, respects expiry, and the new
  *     password replaces the old one.
  *  6. Rate limiting — the 11th rapid login attempt from one IP gets a 429.
@@ -53,6 +59,25 @@ async function post(pagePath, cookie, body) {
   });
 }
 
+// Pre-seed a plain-text bmdlogin row before the server ever starts, so
+// db.js's startup migration (which runs unconditionally, not in response to
+// a login attempt) has something real to hash.
+function seedPlaintextClinicRow() {
+  const Database = require('better-sqlite3');
+  const db = new Database(DB_PATH);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bmdlogin (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      pwd TEXT NOT NULL,
+      expirydate TEXT,
+      limitavailable INTEGER DEFAULT 999
+    )
+  `);
+  db.prepare("INSERT INTO bmdlogin (username, pwd, expirydate) VALUES ('legacy-clinic', 'plaintext99', '2099-12-31')").run();
+  db.close();
+}
+
 async function startServer() {
   serverProc = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
     env: { ...process.env, PORT: String(PORT), DB_PATH, SESSION_SECRET: 'integration-test-secret' },
@@ -79,6 +104,7 @@ async function test(name, fn) {
 }
 
 (async () => {
+  seedPlaintextClinicRow();
   await startServer();
   const db = require('better-sqlite3')(DB_PATH);
 
@@ -107,56 +133,77 @@ async function test(name, fn) {
     consumerCookie = cookie;
   });
 
-  await test('2a. Consumer session cannot compute forecast via POST /mpresult.asp', async () => {
-    const page = await fetch(BASE + '/dashboard', { headers: { cookie: consumerCookie } });
-    const token = (await page.text()).match(/name="_csrf" value="([^"]+)"/)[1];
-    const r = await post('/mpresult.asp', consumerCookie, {
-      _csrf: token, Txt_name: 'X', Txt_age: '34', cmbperiods: 'R', Txt_amh: '2.0',
-    });
-    assert.equal(r.status, 302, 'must redirect, not render a result');
-    assert.equal(r.headers.get('location'), '/dashboard');
+  await test('1c. Historical plain-text bmdlogin password is bcrypt-hashed on startup', async () => {
+    const row = db.prepare("SELECT pwd FROM bmdlogin WHERE username = 'legacy-clinic'").get();
+    assert.ok(row.pwd.startsWith('$2'), `expected a bcrypt hash after startup migration, got: ${row.pwd}`);
   });
 
-  await test('2b. Unauthenticated POST /mpresult.asp redirects to the gate', async () => {
-    // grab the session token from a page that has a form on it
-    const { cookie, token } = await freshSession('/bmdlogin.asp');
-    const r = await post('/mpresult.asp', cookie, {
+  await test('2. Retired /mpresult.asp route no longer exists', async () => {
+    const g = await fetch(BASE + '/mpresult.asp', { redirect: 'manual' });
+    assert.equal(g.status, 404);
+    const { cookie, token } = await freshSession('/bmd.asp');
+    const p = await post('/mpresult.asp', cookie, {
       _csrf: token, Txt_name: 'X', Txt_age: '34', cmbperiods: 'R', Txt_amh: '2.0',
     });
+    assert.equal(p.status, 404);
+  });
+
+  await test('3a. Public BMD calculator computes the published formula/classification with no login', async () => {
+    const { cookie, token } = await freshSession('/bmd.asp');
+    const height = 160, weight = 60, age = 45, hal = 100, nsa = 130;
+    const expectedScore = (
+      1.06861 *
+      Math.pow(height * 0.01, 0.326842) *
+      Math.pow(weight, 0.211909) *
+      Math.pow(hal, 0.0608258) *
+      Math.pow(age, -0.332916) *
+      Math.pow(nsa * 0.0174533, -0.239446)
+    ).toFixed(4);
+    const expectedClass = parseFloat(expectedScore) >= 0.738 ? 'Normal' : parseFloat(expectedScore) >= 0.558 ? 'Osteopenia' : 'Osteoporosis';
+
+    const save = await post('/bmdsave.asp', cookie, {
+      _csrf: token, Txt_name: 'BMD Formula Test', Txt_age: String(age), Txt_height: String(height),
+      Txt_weight: String(weight), Txt_hal: String(hal), Txt_nsa: String(nsa),
+    });
+    assert.equal(save.status, 302);
+    assert.equal(save.headers.get('location'), '/result.asp');
+
+    const result = await fetch(BASE + '/result.asp', { headers: { cookie } });
+    const html = await result.text();
+    assert.ok(html.includes(expectedScore), `expected BMD score ${expectedScore} in result page`);
+    assert.ok(html.includes(expectedClass), `expected classification ${expectedClass} in result page`);
+
+    const guidMatch = html.match(/bmd-report\/([a-f0-9-]+)/);
+    assert.ok(guidMatch, 'result page must link to /bmd-report/:guid');
+    const report = await fetch(BASE + '/bmd-report/' + guidMatch[1]);
+    assert.equal(report.status, 200);
+    assert.ok((await report.text()).includes('BMD Formula Test'));
+  });
+
+  await test('3b. BMD report is not reachable by a guessed/bogus guid', async () => {
+    const r = await fetch(BASE + '/bmd-report/00000000-0000-0000-0000-000000000000', { redirect: 'manual' });
     assert.equal(r.status, 302);
-    assert.equal(r.headers.get('location'), '/forecasting.asp');
+    assert.equal(r.headers.get('location'), '/bmd.asp');
   });
 
-  let clinicCookie, clinicToken;
-
-  await test('3a. Default clinic credentials force a password change', async () => {
-    const { cookie, token } = await freshSession('/bmdlogin.asp');
-    clinicToken = token;
-    const r = await post('/bmdlogin.asp', cookie, {
-      _csrf: token, validate1: 'T', txtusername: 'admin', txtpwd: 'admin123',
-    });
-    assert.equal(r.headers.get('location'), '/clinic-password');
-    const dash = await fetch(BASE + '/clinic-dashboard', { headers: { cookie }, redirect: 'manual' });
-    assert.equal(dash.headers.get('location'), '/clinic-password', 'clinic pages must be blocked until changed');
-    const change = await post('/clinic-password', cookie, {
-      _csrf: token, new_password: 'clinicsecret1', confirm_password: 'clinicsecret1',
-    });
-    assert.equal(change.headers.get('location'), '/clinic-dashboard');
-    clinicCookie = cookie;
-  });
-
-  await test('3b. Clinic session computes the published forecast formulas', async () => {
-    const token = clinicToken; // CSRF token is per-session, unchanged since login
-    for (const [periods, b0, b1] of [['R', 35.49, 0.15], ['I', 41.41, 0.17]]) {
-      const amh = 2.5;
-      const expected = Math.round(b0 * Math.pow(amh, b1));
-      const r = await post('/mpresult.asp', clinicCookie, {
-        _csrf: token, Txt_name: 'Formula Test', Txt_age: '34', cmbperiods: periods, Txt_amh: String(amh),
-      });
-      assert.equal(r.status, 200);
-      const html = await r.text();
-      assert.ok(html.includes(String(expected)), `expected forecast age ${expected} for periods=${periods}`);
+  await test('3c. Retired clinic URLs redirect to /bmd.asp instead of 404ing', async () => {
+    for (const p of ['/bmdlogin.asp', '/clinic-dashboard', '/clinic-password', '/bmd-history', '/bmd-patient/anyone']) {
+      const r = await fetch(BASE + p, { redirect: 'manual' });
+      assert.equal(r.status, 302, p);
+      assert.equal(r.headers.get('location'), '/bmd.asp', p);
     }
+  });
+
+  await test('3d. BMD calculator rate limiter trips after the cap', async () => {
+    let lastLocation;
+    for (let i = 0; i < 11; i++) {
+      const { cookie, token } = await freshSession('/bmd.asp'); // fresh guid each time — bmd.guid is UNIQUE
+      const r = await post('/bmdsave.asp', cookie, {
+        _csrf: token, Txt_name: 'Rate Test', Txt_age: '40', Txt_height: '160', Txt_weight: '60', Txt_hal: '100', Txt_nsa: '130',
+      });
+      lastLocation = r.headers.get('location');
+    }
+    assert.ok(lastLocation.startsWith('/bmd.asp?error='), `11th attempt should be rate-limited, got redirect to ${lastLocation}`);
   });
 
   let resetLink;

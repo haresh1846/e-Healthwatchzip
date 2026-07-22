@@ -4,14 +4,13 @@
   userCount:   locals.userCount   || 0,
   orderCount:  locals.orderCount  || 0,
   resultCount: locals.resultCount || 0,
-  bmdCount:    locals.bmdCount    || 0,
-  clinicCount: locals.clinicCount || 0
+  bmdCount:    locals.bmdCount    || 0
 }) %>
 
 <div class="adm-body">
 
   <div class="adm-section-header">
-    <h1 class="adm-section-title">Marketing Analytics</h1>
+    <h1 class="adm-section-title">Platform Analytics</h1>
     <div class="adm-section-spacer"></div>
     <a href="/admin/analytics?export=csv" class="adm-export">
       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -39,9 +38,61 @@
     </div>
   </div>
 
-  <!-- Conversion funnel -->
+  <!-- BMD headline stats -->
   <div class="adm-section-header" style="margin-top:8px;">
-    <h1 class="adm-section-title" style="font-size:16px;">Conversion Funnel</h1>
+    <h1 class="adm-section-title" style="font-size:16px;">BMD Calculator (free, public)</h1>
+  </div>
+  <div class="adm-stats" style="margin-bottom:28px;">
+    <div class="adm-stat">
+      <div class="adm-stat-label">Total Tests</div>
+      <div class="adm-stat-value"><%= bmdTotal %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Public (no login)</div>
+      <div class="adm-stat-value"><%= bmdPublic %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Legacy Clinic</div>
+      <div class="adm-stat-value"><%= bmdClinic %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Email Capture Rate</div>
+      <div class="adm-stat-value"><%= bmdTotal ? Math.round((bmdWithEmail / bmdTotal) * 100) : 0 %>%</div>
+    </div>
+  </div>
+
+  <!-- BMD classification distribution -->
+  <div class="adm-table-wrap" style="margin-bottom:28px;">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th>Classification</th>
+          <th>Tests</th>
+          <th>% of classified tests</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% const classBadge = { Normal: 'badge-green', Osteopenia: 'badge-yellow', Osteoporosis: 'badge-red' }; %>
+        <% bmdDistribution.forEach(function(d) { %>
+        <tr>
+          <td><span class="badge <%= classBadge[d.name] %>"><%= d.name %></span></td>
+          <td><%= d.count %></td>
+          <td><%= d.pct %>%</td>
+          <td style="min-width:160px;">
+            <div style="background:#F1F5F9;border-radius:6px;height:10px;overflow:hidden;">
+              <div style="background:var(--rose);height:100%;width:<%= d.pct %>%;"></div>
+            </div>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Conversion funnel -->
+  <div class="adm-section-header">
+    <h1 class="adm-section-title" style="font-size:16px;">Consumer Conversion Funnel</h1>
   </div>
   <div class="adm-table-wrap" style="margin-bottom:28px;">
     <table class="adm-table">
@@ -86,6 +137,7 @@
           <th>Orders Created</th>
           <th>Orders Paid</th>
           <th>Revenue</th>
+          <th>BMD Tests</th>
         </tr>
       </thead>
       <tbody>
@@ -96,6 +148,7 @@
           <td><%= d.orders %></td>
           <td><%= d.paid %></td>
           <td>&#8377;<%= (d.revenue_paise / 100).toFixed(0) %></td>
+          <td><%= d.bmd_tests %></td>
         </tr>
         <% }); %>
       </tbody>

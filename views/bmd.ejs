@@ -62,11 +62,8 @@ function calcfm() {
 <section id="about-cont">
   <div class="container">
     <div class="row">
-      <div class="col-xs-12" style="margin-bottom:10px;">
-        <a href="/clinic-dashboard" style="display:inline-flex;align-items:center;gap:5px;font-size:13px;font-weight:700;color:#64748B;text-decoration:none;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Dashboard
-        </a>
+      <div class="col-xs-12" style="margin-bottom:14px;">
+        <p style="font-size:13px;color:#64748B;margin:0;">Free &middot; No account needed &middot; Your result is only ever shown to you</p>
       </div>
       <% if (locals.bmdError) { %>
       <div class="col-xs-12" style="margin-bottom:12px;">
@@ -103,6 +100,11 @@ function calcfm() {
             <div class="form-group inner-tittle">
               <label class="inner-tittle">NSA <span class="red-star">*</span></label>
               <input type="text" class="form-control" id="Txt_nsa" placeholder="NSA" name="Txt_nsa" maxlength="8">
+            </div>
+            <div class="form-group inner-tittle">
+              <label class="inner-tittle">Email (optional)</label>
+              <input type="email" class="form-control" id="Txt_email" placeholder="you@example.com — to get your result emailed" name="Txt_email" maxlength="120">
+              <p style="font-size:11px;color:#94A3B8;margin-top:4px;">Only used to send you this result. See our <a href="/privacy" target="_blank">Privacy Policy</a>.</p>
             </div>
             <button type="button" name="btn_enq" id="btn_enq" class="btn btn-warning submit-form" onclick="calcfm()">Submit</button>
           </div>

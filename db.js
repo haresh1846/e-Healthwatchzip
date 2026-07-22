@@ -6,6 +6,7 @@ const { createClient } = process.env.TURSO_DATABASE_URL
   : require('@libsql/client');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const { computeBmdResult } = require('./lib/bmd');
 
 // Connection: Turso (hosted) when TURSO_DATABASE_URL is set, otherwise a local
 // SQLite file — DB_PATH override lets tests run against an isolated database.
@@ -139,17 +140,52 @@ async function init() {
   await addColumn("ALTER TABLE bmd ADD COLUMN clinic_username TEXT");
   await addColumn("ALTER TABLE bmd ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP");
 
-  // Seed a default clinic user if none exists — bcrypt-hashed from the start
-  const existing = await db.prepare("SELECT COUNT(*) as cnt FROM bmdlogin").get();
-  if (existing.cnt === 0) {
-    const defaultHash = bcrypt.hashSync('admin123', 12);
-    await db.prepare(
-      "INSERT INTO bmdlogin (username, pwd, expirydate, limitavailable) VALUES ('admin', ?, '2099-12-31', 999)"
-    ).run(defaultHash);
-    console.log('Database seeded with default clinic account: admin (password hashed)');
+  // BMD calculator is now free and public (no clinic login required). New
+  // columns support that: which flow a test came through, an optional
+  // visitor email, and the classification computed at submission time (kept
+  // stable even if the formula/thresholds are ever tuned later).
+  await addColumn("ALTER TABLE bmd ADD COLUMN source TEXT");
+  await addColumn("ALTER TABLE bmd ADD COLUMN email TEXT");
+  await addColumn("ALTER TABLE bmd ADD COLUMN classification TEXT");
+  // Backfill: every row that predates the public flow was necessarily
+  // submitted through a clinic login.
+  await db.prepare("UPDATE bmd SET source = 'clinic' WHERE source IS NULL AND clinic_username IS NOT NULL").run();
+  await db.prepare("UPDATE bmd SET source = 'public' WHERE source IS NULL").run();
+
+  // Backfill classification for rows that predate the classification column,
+  // so BMD analytics (Normal/Osteopenia/Osteoporosis distribution) covers
+  // every test ever taken, not just ones submitted after this change.
+  const unclassified = await db.prepare("SELECT id, height, weight, age, hal, nsa FROM bmd WHERE classification IS NULL").all();
+  if (unclassified.length > 0) {
+    const updates = unclassified
+      .map(r => {
+        try {
+          const result = computeBmdResult(r);
+          // NaN inputs (blank/malformed legacy rows) compute a NaN score that
+          // still falls through to a classification string — guard explicitly
+          // rather than storing a wrong label.
+          if (!Number.isFinite(result.score)) return null;
+          return { id: r.id, classification: result.classification };
+        } catch (_) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+    if (updates.length > 0) {
+      await db.batch(updates.map(u => ({
+        sql: 'UPDATE bmd SET classification = ? WHERE id = ?',
+        args: [u.classification, u.id],
+      })));
+      console.log(`[DB] Backfilled classification for ${updates.length} historical BMD record(s)`);
+    }
   }
 
+  // No default clinic account is seeded anymore — BMD is a free public tool
+  // with no login. Historical bmdlogin rows (if any) are preserved untouched
+  // below; nothing authenticates against this table going forward.
+
   // One-time migration: hash any bmdlogin passwords still stored as plain text
+  // (kept for historical-data integrity even though nothing logs in anymore)
   const allLogins = await db.prepare("SELECT id, pwd FROM bmdlogin").all();
   const plainRows = allLogins.filter(r => r.pwd && !r.pwd.startsWith('$2'));
   if (plainRows.length > 0) {
