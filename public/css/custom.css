@@ -121,10 +121,10 @@ textarea.form-control { resize: vertical; min-height: 120px; }
 .ehw-nav__logo:hover .ehw-nav__logo-icon { background: var(--rose); color: white; }
 .ehw-nav__logo-text { font-family: var(--font-serif); font-size: 22px; font-weight: 600; color: var(--stone-dark); }
 .ehw-nav__logo-text span { color: var(--rose); }
-.ehw-nav__links { display: flex; align-items: center; gap: 28px; }
+.ehw-nav__links { display: flex; align-items: center; gap: 22px; }
 .ehw-nav__link {
   font-size: 15px; font-weight: 600; color: var(--stone); padding-bottom: 2px;
-  position: relative; text-decoration: none; transition: color .2s;
+  position: relative; text-decoration: none; transition: color .2s; white-space: nowrap;
 }
 .ehw-nav__link::after {
   content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
@@ -136,9 +136,15 @@ textarea.form-control { resize: vertical; min-height: 120px; }
   background: linear-gradient(135deg, var(--rose), #f43f5e); color: white;
   padding: 10px 22px; border-radius: 9999px; font-weight: 700; font-size: 14px;
   border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-  text-decoration: none; transition: all .3s;
+  text-decoration: none; transition: all .3s; white-space: nowrap;
 }
 .ehw-nav__cta:hover { box-shadow: 0 4px 18px rgba(225,29,72,.35); transform: translateY(-1px); color: white; }
+.ehw-nav__logout {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--stone);
+  text-decoration: none; transition: color .2s;
+}
+.ehw-nav__logout:hover { color: var(--rose); }
 .ehw-nav__hamburger {
   display: none; background: none; border: none; cursor: pointer; color: var(--stone); padding: 4px;
 }
@@ -1082,12 +1088,63 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 .aboutpage-title { font-family:var(--font-serif);font-size:26px;color:var(--rose);margin-bottom:18px; }
 .aboutpage-content { line-height:1.85;color:var(--stone);font-size:15px; }
 .inner-tittle label { font-weight:700;color:var(--stone-dark);margin-bottom:6px;display:block;font-size:14px; }
+
+/* ── Content pages (Gynaecology / Pregnancy / Menopause / Health / etc.) ── */
+.content-layout { display:grid; grid-template-columns:1fr 300px; gap:48px; align-items:start; }
+.content-article h3 {
+  font-family:var(--font-serif); font-size:19px; color:var(--stone-dark); margin:36px 0 12px;
+}
+.content-article h3:first-child { margin-top:0; }
+.content-article p { line-height:1.85; color:var(--stone); font-size:15.5px; margin:0 0 16px; }
+.content-article ul { margin:0 0 16px; padding-left:0; list-style:none; }
+.content-article ul li {
+  position:relative; padding-left:24px; margin-bottom:10px; line-height:1.7;
+  color:var(--stone); font-size:15px;
+}
+.content-article ul li::before {
+  content:''; position:absolute; left:2px; top:8px; width:7px; height:7px;
+  border-radius:50%; background:var(--rose);
+}
+.content-note {
+  background:var(--rose-50); border:1px solid var(--rose-100); border-radius:1rem;
+  padding:18px 22px; font-size:14.5px; color:var(--stone-dark); line-height:1.7; margin:24px 0;
+}
+.content-aside { display:flex; flex-direction:column; gap:20px; position:sticky; top:100px; }
+.content-card {
+  background:white; border:1px solid var(--rose-100); border-radius:1.5rem;
+  padding:24px; box-shadow:0 4px 20px rgba(225,29,72,.06);
+}
+.content-card h4 { font-family:var(--font-serif); font-size:16px; color:var(--stone-dark); margin:0 0 10px; }
+.content-card p { font-size:13.5px; color:var(--stone); line-height:1.6; margin:0 0 16px; }
+.content-card__cta {
+  display:inline-flex; align-items:center; gap:6px; font-size:13.5px; font-weight:700;
+  color:white; background:var(--rose); padding:10px 18px; border-radius:9999px;
+  text-decoration:none; transition:background .2s; width:fit-content;
+}
+.content-card__cta:hover { background:var(--rose-dark); color:white; }
+.content-card__cta--ghost {
+  background:transparent; color:var(--rose); border:1px solid var(--rose-200);
+}
+.content-card__cta--ghost:hover { background:var(--rose-50); color:var(--rose-dark); }
+@media (max-width:900px) {
+  .content-layout { grid-template-columns:1fr; }
+  .content-aside  { position:static; }
+}
 .gotop { color:var(--rose);font-weight:700; }
 #datatable { border-collapse:collapse;width:100%; }
 #datatable td { padding:12px 20px;border:1px solid var(--stone-200); }
 #datatable tr:nth-child(even) { background:var(--stone-50); }
 
 /* ── Responsive ─────────────────────────────────────────────────── */
+/* Nav switches to the hamburger menu well before the hero/grid breakpoints
+   below: six links plus the dashboard/logout controls stop fitting the
+   .ehw-nav__inner (max-width:1280px) container earlier than everything else
+   on the page does. */
+@media (max-width: 1279px) {
+  .ehw-nav__links     { display:none; }
+  .ehw-nav__hamburger { display:flex; }
+}
+
 @media (max-width: 1024px) {
   .ehw-hero__inner   { grid-template-columns:1fr; gap:40px; }
   .ehw-cards         { grid-template-columns:repeat(2,1fr); }
@@ -1100,9 +1157,6 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 
 /* ── Tablet / large mobile (≤768px) ──────────────────────────────── */
 @media (max-width: 768px) {
-  /* Nav */
-  .ehw-nav__links     { display:none; }
-  .ehw-nav__hamburger { display:flex; }
 
   /* Hero — deal card becomes in-flow, no longer absolute */
   .ehw-hero           { padding:40px 0 60px; }

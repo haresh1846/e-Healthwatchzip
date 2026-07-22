@@ -47,71 +47,109 @@ function calcfm() {
 }
 </script>
 
-<!------ About Banner ------->
-<section id="banner-section">
-  <div class="container-fluid">
-    <div class="row">
-      <div class="banner-placeholder text-center">
-        <h2>BMD Calculator</h2>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!------ BMD Form ------->
-<section id="about-cont">
-  <div class="container">
-    <div class="row">
-      <div class="col-xs-12" style="margin-bottom:14px;">
-        <p style="font-size:13px;color:#64748B;margin:0;">Free &middot; No account needed &middot; Your result is only ever shown to you</p>
-      </div>
-      <% if (locals.bmdError) { %>
-      <div class="col-xs-12" style="margin-bottom:12px;">
-        <div style="background:#FFF1F2;border:1px solid #FECDD3;color:#9f1239;border-radius:8px;padding:12px 16px;font-size:14px;">
-          ⚠ <%= bmdError %>
+<div class="auth-bg">
+  <div class="auth-wrap">
+
+    <div class="auth-card">
+      <a href="/" class="auth-brand">
+        <div class="auth-brand-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </div>
-      </div>
+        <span>e-health<strong>watch</strong></span>
+      </a>
+
+      <h1 class="auth-title">BMD Calculator</h1>
+      <p class="auth-sub">Free &middot; No account needed &middot; Your result is only ever shown to you</p>
+
+      <% if (locals.bmdError) { %>
+        <div class="auth-alert">⚠ <%= bmdError %></div>
       <% } %>
-      <form name="frm_salableitems" method="post" action="/bmdsave.asp">
-  <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-        <div class="col-lg-4 col-md-4 col-sm-4 col-xs-12">
-          <h2 class="aboutpage-title">&nbsp;</h2>
-          <div class="aboutpage-content">
-            <div class="form-group inner-tittle">
-              <label class="inner-tittle">Name <span class="red-star">*</span></label>
-              <input type="text" class="form-control" id="Txt_name" placeholder="Name" name="Txt_name" maxlength="50">
-            </div>
-            <div class="form-group inner-tittle">
-              <label class="inner-tittle">Age <span class="red-star">*</span></label>
-              <input type="text" class="form-control" id="Txt_age" placeholder="Age" name="Txt_age" maxlength="4">
-            </div>
-            <div class="form-group inner-tittle">
-              <label class="inner-tittle">Height (in CMS) <span class="red-star">*</span></label>
-              <input type="text" class="form-control" id="Txt_height" placeholder="Height" name="Txt_height" maxlength="8">
-            </div>
-            <div class="form-group inner-tittle">
-              <label class="inner-tittle">Weight (in KGs) <span class="red-star">*</span></label>
-              <input type="text" class="form-control" id="Txt_weight" placeholder="Weight" name="Txt_weight" maxlength="8">
-            </div>
-            <div class="form-group inner-tittle">
-              <label class="inner-tittle">HAL (in MM) <span class="red-star">*</span></label>
-              <input type="text" class="form-control" id="Txt_hal" placeholder="HAL" name="Txt_hal" maxlength="8">
-            </div>
-            <div class="form-group inner-tittle">
-              <label class="inner-tittle">NSA <span class="red-star">*</span></label>
-              <input type="text" class="form-control" id="Txt_nsa" placeholder="NSA" name="Txt_nsa" maxlength="8">
-            </div>
-            <div class="form-group inner-tittle">
-              <label class="inner-tittle">Email (optional)</label>
-              <input type="email" class="form-control" id="Txt_email" placeholder="you@example.com — to get your result emailed" name="Txt_email" maxlength="120">
-              <p style="font-size:11px;color:#94A3B8;margin-top:4px;">Only used to send you this result. See our <a href="/privacy" target="_blank">Privacy Policy</a>.</p>
-            </div>
-            <button type="button" name="btn_enq" id="btn_enq" class="btn btn-warning submit-form" onclick="calcfm()">Submit</button>
+
+      <form name="frm_salableitems" method="post" action="/bmdsave.asp" class="auth-form">
+        <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+        <div class="auth-field">
+          <label for="Txt_name">Name <span class="red-star">*</span></label>
+          <input type="text" class="form-control" id="Txt_name" placeholder="Name" name="Txt_name" maxlength="50">
+        </div>
+
+        <div class="auth-row-2">
+          <div class="auth-field">
+            <label for="Txt_age">Age <span class="red-star">*</span></label>
+            <input type="text" class="form-control" id="Txt_age" placeholder="Age" name="Txt_age" maxlength="4">
+          </div>
+          <div class="auth-field">
+            <label for="Txt_height">Height (in CMS) <span class="red-star">*</span></label>
+            <input type="text" class="form-control" id="Txt_height" placeholder="Height" name="Txt_height" maxlength="8">
           </div>
         </div>
+
+        <div class="auth-row-2">
+          <div class="auth-field">
+            <label for="Txt_weight">Weight (in KGs) <span class="red-star">*</span></label>
+            <input type="text" class="form-control" id="Txt_weight" placeholder="Weight" name="Txt_weight" maxlength="8">
+          </div>
+          <div class="auth-field">
+            <label for="Txt_hal">HAL (in MM) <span class="red-star">*</span></label>
+            <input type="text" class="form-control" id="Txt_hal" placeholder="HAL" name="Txt_hal" maxlength="8">
+          </div>
+        </div>
+
+        <div class="auth-field">
+          <label for="Txt_nsa">NSA <span class="red-star">*</span></label>
+          <input type="text" class="form-control" id="Txt_nsa" placeholder="NSA" name="Txt_nsa" maxlength="8">
+        </div>
+
+        <div class="auth-field">
+          <label for="Txt_email">Email (optional)</label>
+          <input type="email" class="form-control" id="Txt_email" placeholder="you@example.com" name="Txt_email" maxlength="120">
+          <span class="auth-field-hint">To get your result emailed. See our <a href="/privacy" target="_blank">Privacy Policy</a>.</span>
+        </div>
+
+        <button type="button" name="btn_enq" id="btn_enq" class="auth-submit" onclick="calcfm()">Calculate my BMD
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
       </form>
     </div>
+
+    <!-- Info panel -->
+    <div class="auth-panel">
+      <div class="auth-panel-inner">
+        <h3>Understand your bone health</h3>
+        <ul class="auth-features">
+          <li>
+            <span class="auth-feat-icon">🦴</span>
+            <div>
+              <strong>What BMD measures</strong>
+              <p>Bone Mineral Density, estimated from your height, weight, age, and two simple X-ray-derived measurements (HAL, NSA)</p>
+            </div>
+          </li>
+          <li>
+            <span class="auth-feat-icon">📊</span>
+            <div>
+              <strong>WHO-standard classification</strong>
+              <p>Normal (&ge; 0.738 g/cm&sup2;), Osteopenia (0.558&ndash;0.738), or Osteoporosis (&lt; 0.558) &mdash; explained in plain language</p>
+            </div>
+          </li>
+          <li>
+            <span class="auth-feat-icon">🔒</span>
+            <div>
+              <strong>Private &amp; instant</strong>
+              <p>No login, no account created. Your result is shown only to you, with an optional emailed copy</p>
+            </div>
+          </li>
+        </ul>
+        <div class="auth-price-badge">
+          <div>
+            <div class="auth-price-label">Cost</div>
+            <div class="auth-price-row"><span class="auth-price-amt">Free</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
-</section>
+</div>
 
 <%- include('partials/footer') %>
