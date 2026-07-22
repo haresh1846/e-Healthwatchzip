@@ -744,7 +744,6 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   float:right; margin:0 0 28px 36px; max-width:360px;
   border-radius:28px; overflow:hidden;
   box-shadow:0 8px 32px rgba(225,29,72,.10);
-  border:3px solid var(--rose-100);
 }
 .page-illus { width:100%; display:block; }
 @media (max-width:768px) {
