@@ -121,10 +121,10 @@ textarea.form-control { resize: vertical; min-height: 120px; }
 .ehw-nav__logo:hover .ehw-nav__logo-icon { background: var(--rose); color: white; }
 .ehw-nav__logo-text { font-family: var(--font-serif); font-size: 22px; font-weight: 600; color: var(--stone-dark); }
 .ehw-nav__logo-text span { color: var(--rose); }
-.ehw-nav__links { display: flex; align-items: center; gap: 28px; }
+.ehw-nav__links { display: flex; align-items: center; gap: 22px; }
 .ehw-nav__link {
   font-size: 15px; font-weight: 600; color: var(--stone); padding-bottom: 2px;
-  position: relative; text-decoration: none; transition: color .2s;
+  position: relative; text-decoration: none; transition: color .2s; white-space: nowrap;
 }
 .ehw-nav__link::after {
   content: ''; position: absolute; bottom: 0; left: 0; width: 100%; height: 2px;
@@ -136,9 +136,15 @@ textarea.form-control { resize: vertical; min-height: 120px; }
   background: linear-gradient(135deg, var(--rose), #f43f5e); color: white;
   padding: 10px 22px; border-radius: 9999px; font-weight: 700; font-size: 14px;
   border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-  text-decoration: none; transition: all .3s;
+  text-decoration: none; transition: all .3s; white-space: nowrap;
 }
 .ehw-nav__cta:hover { box-shadow: 0 4px 18px rgba(225,29,72,.35); transform: translateY(-1px); color: white; }
+.ehw-nav__logout {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--stone);
+  text-decoration: none; transition: color .2s;
+}
+.ehw-nav__logout:hover { color: var(--rose); }
 .ehw-nav__hamburger {
   display: none; background: none; border: none; cursor: pointer; color: var(--stone); padding: 4px;
 }
@@ -1088,6 +1094,15 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 #datatable tr:nth-child(even) { background:var(--stone-50); }
 
 /* ── Responsive ─────────────────────────────────────────────────── */
+/* Nav switches to the hamburger menu well before the hero/grid breakpoints
+   below: six links plus the dashboard/logout controls stop fitting the
+   .ehw-nav__inner (max-width:1280px) container earlier than everything else
+   on the page does. */
+@media (max-width: 1279px) {
+  .ehw-nav__links     { display:none; }
+  .ehw-nav__hamburger { display:flex; }
+}
+
 @media (max-width: 1024px) {
   .ehw-hero__inner   { grid-template-columns:1fr; gap:40px; }
   .ehw-cards         { grid-template-columns:repeat(2,1fr); }
@@ -1100,9 +1115,6 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 
 /* ── Tablet / large mobile (≤768px) ──────────────────────────────── */
 @media (max-width: 768px) {
-  /* Nav */
-  .ehw-nav__links     { display:none; }
-  .ehw-nav__hamburger { display:flex; }
 
   /* Hero — deal card becomes in-flow, no longer absolute */
   .ehw-hero           { padding:40px 0 60px; }
