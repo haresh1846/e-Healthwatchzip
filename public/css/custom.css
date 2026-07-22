@@ -1075,13 +1075,14 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 
 /* ── Inner page styles ──────────────────────────────────────────── */
 #banner-section {
-  background:linear-gradient(135deg,var(--rose) 0%,#f43f5e 100%);
-  padding:64px 24px;text-align:center;color:white;
+  background:linear-gradient(135deg,var(--cream) 0%,#ffe4e6 100%);
+  padding:64px 24px;text-align:center;
+  border-bottom:1px solid var(--rose-100);
 }
 #banner-section .container-fluid { text-align:center; }
-#banner-section h2, .banner-placeholder h2 { font-family:var(--font-serif);font-size:32px;color:white;margin:0;text-align:center; }
-.banner-placeholder { width:100%;color:white;padding:20px 0;text-align:center; }
-.banner-placeholder p { margin-top:10px;opacity:.85;font-size:17px; }
+#banner-section h2, .banner-placeholder h2 { font-family:var(--font-serif);font-size:32px;color:var(--rose);margin:0;text-align:center; }
+.banner-placeholder { width:100%;color:var(--stone-dark);padding:20px 0;text-align:center; }
+.banner-placeholder p { margin-top:10px;color:var(--stone);font-size:17px; }
 #about-cont { padding:60px 0;background:var(--cream); }
 .aboutpage-title { font-family:var(--font-serif);font-size:26px;color:var(--rose);margin-bottom:18px; }
 .aboutpage-content { line-height:1.85;color:var(--stone);font-size:15px; }
