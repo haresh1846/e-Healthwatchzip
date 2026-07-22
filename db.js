@@ -18,6 +18,26 @@ const client = createClient({
   authToken: process.env.TURSO_AUTH_TOKEN,
 });
 
+// The Turso web client issues a real HTTP fetch per call. On Vercel this
+// function's region rarely matches the database's region (see replit.md), so
+// occasional ETIMEDOUT/ECONNRESET/"fetch failed" round trips are expected
+// network noise, not a broken query — retry those a couple of times with a
+// short backoff before surfacing a 500. Non-network errors (bad SQL, a
+// constraint violation) are not retried; they'll fail the same way every time.
+const RETRYABLE = /fetch failed|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|ENOTFOUND|socket hang up/i;
+
+async function withRetry(fn, attempts = 3) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const detail = `${err && err.message} ${err && err.cause && err.cause.message}`;
+      if (attempt >= attempts || !RETRYABLE.test(detail)) throw err;
+      await new Promise(resolve => setTimeout(resolve, 150 * attempt));
+    }
+  }
+}
+
 // ─── Thin async wrapper mirroring the better-sqlite3 call shape ──────────────
 // Every call site does `await db.prepare(sql).get/all/run(...)`.
 function rowToObject(columns, row) {
@@ -30,15 +50,15 @@ const db = {
   prepare(sql) {
     return {
       async get(...args) {
-        const rs = await client.execute({ sql, args });
+        const rs = await withRetry(() => client.execute({ sql, args }));
         return rs.rows.length ? rowToObject(rs.columns, rs.rows[0]) : undefined;
       },
       async all(...args) {
-        const rs = await client.execute({ sql, args });
+        const rs = await withRetry(() => client.execute({ sql, args }));
         return rs.rows.map(r => rowToObject(rs.columns, r));
       },
       async run(...args) {
-        const rs = await client.execute({ sql, args });
+        const rs = await withRetry(() => client.execute({ sql, args }));
         return {
           changes: rs.rowsAffected,
           lastInsertRowid: rs.lastInsertRowid !== undefined ? Number(rs.lastInsertRowid) : undefined,
@@ -47,11 +67,11 @@ const db = {
     };
   },
   async exec(sql) {
-    await client.executeMultiple(sql);
+    await withRetry(() => client.executeMultiple(sql));
   },
   // Atomic multi-statement write (replaces better-sqlite3's db.transaction)
   async batch(statements) {
-    return client.batch(statements.map(s => ({ sql: s.sql, args: s.args || [] })), 'write');
+    return withRetry(() => client.batch(statements.map(s => ({ sql: s.sql, args: s.args || [] })), 'write'));
   },
 };
 
