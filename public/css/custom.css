@@ -1080,7 +1080,7 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 }
 #banner-section .container-fluid { text-align:center; }
 #banner-section h2, .banner-placeholder h2 { font-family:var(--font-serif);font-size:32px;color:white;margin:0;text-align:center; }
-.banner-placeholder { color:white;padding:20px 0;text-align:center; }
+.banner-placeholder { width:100%;color:white;padding:20px 0;text-align:center; }
 .banner-placeholder p { margin-top:10px;opacity:.85;font-size:17px; }
 #about-cont { padding:60px 0;background:var(--cream); }
 .aboutpage-title { font-family:var(--font-serif);font-size:26px;color:var(--rose);margin-bottom:18px; }
