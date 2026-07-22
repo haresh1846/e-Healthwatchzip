@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 const { buildReceiptPdf, buildForecastReportPdf, computeForecastInterpretation } = require('./lib/pdf');
+const { computeBmdResult } = require('./lib/bmd');
 const db = require('./db');
 const SqliteSessionStore = require('./session-store');
 
@@ -173,7 +174,6 @@ app.use(session({
 
 // Helper: make session available in all templates
 app.use((req, res, next) => {
-  res.locals.userid       = req.session.userid       || '';
   res.locals.consumerId   = req.session.consumerId   || null;
   res.locals.consumerName = req.session.consumerName || '';
   next();
@@ -244,24 +244,6 @@ function requireConsumer(req, res, next) {
     return res.redirect('/login?next=' + encodeURIComponent(req.originalUrl));
   }
   next();
-}
-
-// Clinic auth guard — accounts still on the seeded default password are
-// forced through /clinic-password before they can use any clinic page, and
-// accounts disabled by the admin are signed out even mid-session.
-async function requireClinic(req, res, next) {
-  try {
-    if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-    const acct = await db.prepare('SELECT disabled FROM bmdlogin WHERE username = ?').get(req.session.userid);
-    if (!acct || acct.disabled) {
-      req.session.userid = null;
-      return res.redirect('/bmdlogin.asp?msg=' + encodeURIComponent('This account has been disabled. Please contact the administrator.'));
-    }
-    if (req.session.mustChangePassword) return res.redirect('/clinic-password');
-    next();
-  } catch (err) {
-    next(err);
-  }
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -374,182 +356,31 @@ app.post(['/contact.asp', '/Contact.asp'], async (req, res) => {
   res.render('contact', { contactSuccess: true });
 });
 
-// BMD Login – GET
-app.get('/bmdlogin.asp', async (req, res) => {
-  const msg = req.query.msg || '';
-  res.render('bmdlogin', { msg });
+// ─── BMD Calculator (free, public — no login required) ───────────────────────
+// Retired: clinic login, scan limits, and per-clinic history. Old URLs from
+// that flow redirect straight to the calculator rather than 404ing.
+app.get(['/bmdlogin.asp', '/clinic-password', '/clinic-dashboard', '/bmd-history'], async (req, res) => {
+  res.redirect('/bmd.asp');
+});
+app.get('/bmd-patient/:name', async (req, res) => {
+  res.redirect('/bmd.asp');
 });
 
-// BMD Login – POST
-app.post('/bmdlogin.asp', async (req, res) => {
-  if (rateLimited('bmdlogin:' + req.ip)) {
-    return res.status(429).render('bmdlogin', { msg: RATE_LIMIT_MESSAGE });
-  }
-
-  const { validate1, txtusername, txtpwd } = req.body;
-
-  if (validate1 !== 'T') {
-    return res.render('bmdlogin', { msg: '' });
-  }
-
-  const user = await db.prepare(
-    "SELECT username, pwd, expirydate, limitavailable, disabled FROM bmdlogin WHERE username = ?"
-  ).get(txtusername);
-
-  if (!user) {
-    return res.render('bmdlogin', { msg: 'Invalid user credentials. Please try again.' });
-  }
-
-  if (user.disabled) {
-    return res.render('bmdlogin', { msg: 'This account has been disabled. Please contact the administrator.' });
-  }
-
-  // Determine whether the stored value is a bcrypt hash or a legacy plain-text password.
-  const isHashed = user.pwd && user.pwd.startsWith('$2');
-  let passwordValid = false;
-
-  if (isHashed) {
-    passwordValid = await bcrypt.compare(txtpwd, user.pwd);
-  } else {
-    // Legacy plain-text match
-    passwordValid = user.pwd === txtpwd;
-    if (passwordValid) {
-      // Transparently rehash on first successful login so the plain-text value
-      // is replaced and will never be stored again.
-      const newHash = await bcrypt.hash(txtpwd, 12);
-      await db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(newHash, user.username);
-      console.log(`[BMD] Rehashed plain-text password for clinic account: ${user.username}`);
-    }
-  }
-
-  if (!passwordValid) {
-    return res.render('bmdlogin', { msg: 'Invalid user credentials. Please try again.' });
-  }
-
-  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const expiry = user.expirydate ? user.expirydate.replace(/-/g, '') : '99991231';
-
-  if (expiry < today) {
-    return res.render('bmdlogin', { msg: 'Demo version expired. Please contact the administrator.' });
-  }
-
-  req.session.userid = user.username;
-
-  // The seeded default credentials are publicly documented — force a change
-  // before this account can use any clinic page.
-  if (user.username === 'admin' && txtpwd === 'admin123') {
-    req.session.mustChangePassword = true;
-    return res.redirect('/clinic-password');
-  }
-
-  return res.redirect('/clinic-dashboard');
-});
-
-// Forced password change for clinic accounts on default credentials
-app.get('/clinic-password', async (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-  res.render('clinic-password', { error: null, username: req.session.userid });
-});
-app.post('/clinic-password', async (req, res) => {
-  if (!req.session.userid) return res.redirect('/bmdlogin.asp');
-  const username = req.session.userid;
-  const { new_password, confirm_password } = req.body;
-  if (!new_password || new_password.length < 8) {
-    return res.render('clinic-password', { error: 'Password must be at least 8 characters.', username });
-  }
-  if (new_password !== confirm_password) {
-    return res.render('clinic-password', { error: 'Passwords do not match.', username });
-  }
-  if (new_password === 'admin123') {
-    return res.render('clinic-password', { error: 'Please choose a password different from the default one.', username });
-  }
-  const hash = await bcrypt.hash(new_password, 12);
-  await db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
-  console.log(`[BMD] Default password replaced for clinic account: ${username}`);
-  req.session.mustChangePassword = false;
-  res.redirect('/clinic-dashboard');
-});
-
-// BMD Logout
-app.get('/bmdlogout', async (req, res) => {
-  req.session.userid = null;
-  res.redirect('/bmdlogin.asp');
-});
-
-// Clinic Dashboard – GET (auth required)
-app.get('/clinic-dashboard', requireClinic, async (req, res) => {
-  const account = await db.prepare(
-    'SELECT username, limitavailable, expirydate FROM bmdlogin WHERE username = ?'
-  ).get(req.session.userid);
-
-  if (!account) {
-    req.session.userid = null;
-    return res.redirect('/bmdlogin.asp');
-  }
-
-  const scansUsed = (await db.prepare(
-    'SELECT COUNT(*) as cnt FROM bmd WHERE clinic_username = ?'
-  ).get(req.session.userid) || {}).cnt || 0;
-
-  const recentRows = await db.prepare(
-    'SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC LIMIT 5'
-  ).all(req.session.userid);
-  const recent = recentRows.map(r => {
-    const h = parseFloat(r.height), w = parseFloat(r.weight);
-    const a = parseFloat(r.age), hal = parseFloat(r.hal), nsa = parseFloat(r.nsa);
-    let score = null;
-    if (![h, w, a, hal, nsa].some(isNaN)) {
-      score = (1.06861 * Math.pow(h * 0.01, 0.326842) * Math.pow(w, 0.211909) *
-               Math.pow(hal, 0.0608258) * Math.pow(a, -0.332916) *
-               Math.pow(nsa * 0.0174533, -0.239446)).toFixed(4);
-    }
-    return { ...r, score, dateStr: r.created_at ? r.created_at.slice(0, 10) : '—' };
-  });
-
-  // Expiry warning: flag if expiry is within 30 days or already past
-  const today = new Date();
-  let expiryWarning = false;
-  let expiryLabel = account.expirydate || 'No expiry set';
-  if (account.expirydate) {
-    const exp = new Date(account.expirydate);
-    const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
-    if (diffDays <= 30) expiryWarning = true;
-  }
-
-  res.render('clinic-dashboard', {
-    account,
-    scansUsed,
-    recent,
-    expiryWarning,
-    expiryLabel,
-  });
-});
-
-// BMD Calculator – GET (auth required)
-app.get('/bmd.asp', requireClinic, async (req, res) => {
+// BMD Calculator – GET
+app.get('/bmd.asp', async (req, res) => {
   req.session.guid = crypto.randomUUID();
   res.render('bmd', { bmdError: req.query.error || null });
 });
 
 // BMD Save – POST
-app.post('/bmdsave.asp', requireClinic, async (req, res) => {
+app.post('/bmdsave.asp', async (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
-  const user = await db.prepare(
-    "SELECT limitavailable FROM bmdlogin WHERE username = ?"
-  ).get(req.session.userid);
-
-  if (!user) {
-    req.session.userid = '';
-    return res.redirect('/bmdlogin.asp?msg=Invalid+user+credentials.+Please+try+again.');
+  if (rateLimited('bmdcalc:' + req.ip)) {
+    return res.redirect('/bmd.asp?error=' + encodeURIComponent(RATE_LIMIT_MESSAGE));
   }
 
-  if (parseInt(user.limitavailable) === 0) {
-    req.session.userid = '';
-    return res.redirect('/bmdlogin.asp?msg=You+have+exceeded+your+limit.+Please+contact+the+administrator.');
-  }
-
-  const { Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa } = req.body;
+  const { Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, Txt_email } = req.body;
   const guid = req.session.guid;
 
   // Server-side validation: all numeric fields must be positive numbers
@@ -572,19 +403,18 @@ app.post('/bmdsave.asp', requireClinic, async (req, res) => {
     return res.redirect('/bmd.asp?error=' + encodeURIComponent(bmdInputError));
   }
 
-  await db.prepare(
-    "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid, clinic_username) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, guid, req.session.userid);
+  const { classification } = computeBmdResult({ height: Txt_height, weight: Txt_weight, age: Txt_age, hal: Txt_hal, nsa: Txt_nsa });
+  const email = (Txt_email || '').trim() || null;
 
   await db.prepare(
-    "UPDATE bmdlogin SET limitavailable = limitavailable - 1 WHERE username = ?"
-  ).run(req.session.userid);
+    "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid, source, email, classification) VALUES (?, ?, ?, ?, ?, ?, ?, 'public', ?, ?)"
+  ).run(Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, guid, email, classification);
 
   return res.redirect('/result.asp');
 });
 
 // BMD Result
-app.get('/result.asp', requireClinic, async (req, res) => {
+app.get('/result.asp', async (req, res) => {
   if (!req.session.guid) return res.redirect('/bmd.asp');
 
   const guid = req.session.guid;
@@ -592,115 +422,42 @@ app.get('/result.asp', requireClinic, async (req, res) => {
 
   if (!row) return res.redirect('/bmd.asp');
 
-  const height = parseFloat(row.height);
-  const weight = parseFloat(row.weight);
-  const age    = parseFloat(row.age);
-  const hal    = parseFloat(row.hal);
-  const nsa    = parseFloat(row.nsa);
+  const { score, classification, classColor, classNote } = computeBmdResult(row);
 
-  const bmdScore = parseFloat((
-    1.06861 *
-    Math.pow(height * 0.01, 0.326842) *
-    Math.pow(weight, 0.211909) *
-    Math.pow(hal, 0.0608258) *
-    Math.pow(age, -0.332916) *
-    Math.pow(nsa * 0.0174533, -0.239446)
-  ).toFixed(4));
-
-  // WHO classification thresholds for femoral neck BMD (g/cm²)
-  // Based on NHANES III reference data: young adult mean 0.858, SD 0.120
-  //   T-score −1.0  →  BMD ≥ 0.738  → Normal
-  //   T-score −2.5  →  BMD ≥ 0.558  → Osteopenia
-  //                    BMD  < 0.558  → Osteoporosis
-  let classification, classColor, classNote;
-  if (bmdScore >= 0.738) {
-    classification = 'Normal';
-    classColor     = 'green';
-    classNote      = 'Bone density is within the normal range. Maintain with regular weight-bearing exercise and adequate calcium intake.';
-  } else if (bmdScore >= 0.558) {
-    classification = 'Osteopenia';
-    classColor     = 'amber';
-    classNote      = 'Bone density is lower than normal. Consider lifestyle modifications, dietary calcium, vitamin D supplementation, and a DEXA scan for monitoring.';
-  } else {
-    classification = 'Osteoporosis';
-    classColor     = 'rose';
-    classNote      = 'Bone density is significantly reduced. Refer to a specialist for DEXA scan, pharmacological assessment, and fracture risk evaluation.';
-  }
-
-  // Records are now kept permanently — no DELETE here.
-  // Clear the guid from the session so Back → /bmd.asp gets a fresh form.
+  // Records are kept permanently for the visitor to revisit via /bmd-report,
+  // but clear the guid from the session so Back → /bmd.asp gets a fresh form.
   req.session.guid = null;
 
   res.render('result', {
-    result: bmdScore.toFixed(4),
+    result: score.toFixed(4),
     name: row.name,
-    recordId: row.id,
+    guid: row.guid,
     classification,
     classColor,
     classNote,
   });
 });
 
-// BMD Report – printable page for a specific record
-app.get('/bmd-report/:id', requireClinic, async (req, res) => {
-  const record = await db.prepare(
-    'SELECT * FROM bmd WHERE id = ? AND clinic_username = ?'
-  ).get(req.params.id, req.session.userid);
+// BMD Report – printable page for a specific test. Identified by guid (an
+// unguessable crypto.randomUUID) rather than the row's sequential id, since
+// there is no login/ownership check to gate access with anymore — the guid
+// itself is the access token, the same pattern /result.asp already relies on.
+app.get('/bmd-report/:guid', async (req, res) => {
+  const record = await db.prepare('SELECT * FROM bmd WHERE guid = ?').get(req.params.guid);
 
-  if (!record) return res.redirect('/bmd-history');
+  if (!record) return res.redirect('/bmd.asp');
 
-  const h = parseFloat(record.height), w = parseFloat(record.weight);
-  const a = parseFloat(record.age), hal = parseFloat(record.hal), nsa = parseFloat(record.nsa);
-
-  const bmdScore = parseFloat((
-    1.06861 *
-    Math.pow(h * 0.01, 0.326842) *
-    Math.pow(w, 0.211909) *
-    Math.pow(hal, 0.0608258) *
-    Math.pow(a, -0.332916) *
-    Math.pow(nsa * 0.0174533, -0.239446)
-  ).toFixed(4));
-
-  let classification, classColor, classNote;
-  if (bmdScore >= 0.738) {
-    classification = 'Normal';       classColor = 'green';
-    classNote = 'Bone density is within the normal range. Maintain with regular weight-bearing exercise and adequate calcium intake.';
-  } else if (bmdScore >= 0.558) {
-    classification = 'Osteopenia';   classColor = 'amber';
-    classNote = 'Bone density is lower than normal. Consider lifestyle modifications, dietary calcium, vitamin D supplementation, and a DEXA scan for monitoring.';
-  } else {
-    classification = 'Osteoporosis'; classColor = 'rose';
-    classNote = 'Bone density is significantly reduced. Refer to a specialist for DEXA scan, pharmacological assessment, and fracture risk evaluation.';
-  }
-
+  const { score, classification, classColor, classNote } = computeBmdResult(record);
   const printDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
   res.render('bmd-report', {
     record,
-    result: bmdScore.toFixed(4),
+    result: score.toFixed(4),
     classification,
     classColor,
     classNote,
-    clinicUser: req.session.userid,
     printDate,
   });
-});
-
-// BMD History – all records for this clinic
-app.get('/bmd-history', requireClinic, async (req, res) => {
-  const records = await db.prepare(
-    "SELECT * FROM bmd WHERE clinic_username = ? ORDER BY id DESC"
-  ).all(req.session.userid);
-  res.render('bmd-history', { records, clinicUser: req.session.userid, patientFilter: null });
-});
-
-// BMD History – per-patient view
-app.get('/bmd-patient/:name', requireClinic, async (req, res) => {
-  const name = req.params.name;
-  const records = await db.prepare(
-    "SELECT * FROM bmd WHERE clinic_username = ? AND LOWER(name) = LOWER(?) ORDER BY id DESC"
-  ).all(req.session.userid, name);
-  res.render('bmd-history', { records, clinicUser: req.session.userid, patientFilter: name });
 });
 
 // ─── Consumer Account Routes ─────────────────────────────────────────────────
@@ -1294,44 +1051,16 @@ app.get('/forecasting.asp', async (req, res) => {
   res.render('forecasting');
 });
 
-// Menopause Forecasting Result – POST
-// Kept for backward compatibility with BMD clinic workflow only.
-// Consumers must go through the paid /forecast/:profileId flow — allowing a
-// consumer session here would let them compute the forecast without paying.
-app.post('/mpresult.asp', async (req, res) => {
-  if (!req.session.userid) {
-    return res.redirect(req.session.consumerId ? '/dashboard' : '/forecasting.asp');
-  }
-
-  const { Txt_name, Txt_age, cmbperiods, Txt_amh } = req.body;
-
-  let b0, b1, periods;
-  if (cmbperiods === 'R') {
-    periods = 'Regular';
-    b0 = 35.49;
-    b1 = 0.15;
-  } else {
-    periods = 'Irregular';
-    b0 = 41.41;
-    b1 = 0.17;
-  }
-
-  const amhvalue = parseFloat(Txt_amh);
-  const fmvalue = Math.round(b0 * Math.pow(amhvalue, b1));
-
-  res.render('mpresult', {
-    name: Txt_name,
-    age: Txt_age,
-    periods,
-    amhvalue,
-    fmvalue
-  });
-});
+// Note: the old /mpresult.asp POST existed only as a backdoor for clinic
+// sessions to compute the forecast without paying. Now that clinic logins
+// are retired (BMD is free/public instead), that session type no longer
+// exists, so the route is gone — the paid /forecast/:profileId flow is the
+// only way to compute a menopause forecast.
 
 // Logout
 app.get('/logout.asp', async (req, res) => {
   req.session.destroy();
-  res.redirect('/bmdlogin.asp');
+  res.redirect('/');
 });
 
 // ─── Admin Panel ─────────────────────────────────────────────────────────────
@@ -1418,7 +1147,6 @@ async function getTabCounts() {
     orderCount:  (await db.prepare('SELECT COUNT(*) as c FROM consumer_orders').get() || {}).c || 0,
     resultCount: (await db.prepare('SELECT COUNT(*) as c FROM mp_results_v2').get() || {}).c || 0,
     bmdCount:    (await db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
-    clinicCount: (await db.prepare('SELECT COUNT(*) as c FROM bmdlogin').get() || {}).c || 0,
   };
 }
 
@@ -1564,149 +1292,29 @@ app.get('/admin/bmd', requireAdmin, async (req, res) => {
 
   if (req.query.export === 'csv') {
     return sendCsv(res, 'bmd-records.csv', [
-      { key: 'id',     label: 'ID' },
-      { key: 'name',   label: 'Patient Name' },
-      { key: 'age',    label: 'Age' },
-      { key: 'height', label: 'Height (cm)' },
-      { key: 'weight', label: 'Weight (kg)' },
-      { key: 'hal',    label: 'HAL' },
-      { key: 'nsa',    label: 'NSA (degrees)' },
-      { key: 'guid',   label: 'Session ID' },
+      { key: 'id',             label: 'ID' },
+      { key: 'name',           label: 'Patient Name' },
+      { key: 'age',            label: 'Age' },
+      { key: 'height',         label: 'Height (cm)' },
+      { key: 'weight',         label: 'Weight (kg)' },
+      { key: 'hal',            label: 'HAL' },
+      { key: 'nsa',            label: 'NSA (degrees)' },
+      { key: 'classification', label: 'Classification' },
+      { key: 'source',         label: 'Source' },
+      { key: 'email',          label: 'Email' },
+      { key: 'clinic_username',label: 'Legacy Clinic' },
+      { key: 'created_at',     label: 'Date' },
+      { key: 'guid',           label: 'Session ID' },
     ], records);
   }
 
   res.render('admin/bmd', { records, ...await getTabCounts() });
 });
 
-// POST /admin/clinic/create — new clinic account
-app.post('/admin/clinic/create', requireAdmin, async (req, res) => {
-  const username = String(req.body.username || '').trim();
-  const { password, expirydate, limitavailable } = req.body;
-
-  if (!/^[A-Za-z0-9_.-]{3,50}$/.test(username)) {
-    req.session.clinicFlash = { type: 'error', message: 'Username must be 3–50 characters (letters, numbers, dot, dash, underscore).' };
-    return res.redirect('/admin/clinic');
-  }
-  if (!password || password.length < 8) {
-    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 8 characters.' };
-    return res.redirect('/admin/clinic');
-  }
-  const limit = parseInt(limitavailable, 10);
-  if (isNaN(limit) || limit < 0) {
-    req.session.clinicFlash = { type: 'error', message: 'Scan limit must be a non-negative whole number.' };
-    return res.redirect('/admin/clinic');
-  }
-  if (expirydate && !/^\d{4}-\d{2}-\d{2}$/.test(expirydate)) {
-    req.session.clinicFlash = { type: 'error', message: 'Expiry date must be in YYYY-MM-DD format.' };
-    return res.redirect('/admin/clinic');
-  }
-  if (await db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username)) {
-    req.session.clinicFlash = { type: 'error', message: `An account named "${username}" already exists.` };
-    return res.redirect('/admin/clinic');
-  }
-
-  const hash = await bcrypt.hash(password, 12);
-  await db.prepare('INSERT INTO bmdlogin (username, pwd, expirydate, limitavailable) VALUES (?, ?, ?, ?)')
-    .run(username, hash, expirydate || null, limit);
-  console.log(`[Admin] Clinic account created: ${username}`);
-  req.session.clinicFlash = { type: 'success', message: `Clinic account "${username}" created.` };
-  res.redirect('/admin/clinic');
-});
-
-// POST /admin/clinic/:username/toggle — disable / re-enable an account
-app.post('/admin/clinic/:username/toggle', requireAdmin, async (req, res) => {
-  const { username } = req.params;
-  const account = await db.prepare('SELECT id, disabled FROM bmdlogin WHERE username = ?').get(username);
-  if (!account) {
-    req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
-    return res.redirect('/admin/clinic');
-  }
-  const newState = account.disabled ? 0 : 1;
-  await db.prepare('UPDATE bmdlogin SET disabled = ? WHERE username = ?').run(newState, username);
-  console.log(`[Admin] Clinic account ${newState ? 'disabled' : 're-enabled'}: ${username}`);
-  req.session.clinicFlash = { type: 'success', message: `Account "${username}" ${newState ? 'disabled' : 're-enabled'}.` };
-  res.redirect('/admin/clinic');
-});
-
-// GET /admin/clinic
-app.get('/admin/clinic', requireAdmin, async (req, res) => {
-  const rows = await db.prepare('SELECT id, username, expirydate, limitavailable, disabled, pwd FROM bmdlogin ORDER BY id').all();
-
-  const accounts = rows.map(r => ({
-    ...r,
-    // Expose whether this account still has the known-insecure default credentials.
-    // Works for both legacy plain-text storage and post-migration bcrypt hashes.
-    isDefault: r.username === 'admin' && (
-      r.pwd === 'admin123' ||
-      (r.pwd && r.pwd.startsWith('$2') && bcrypt.compareSync('admin123', r.pwd))
-    ),
-    // Strip pwd from the object passed to the template — never render passwords
-    pwd: undefined,
-  }));
-
-  const hasDefaultCredentials = accounts.some(a => a.isDefault);
-
-  res.render('admin/clinic', {
-    accounts,
-    hasDefaultCredentials,
-    flash: req.session.clinicFlash || null,
-    ...await getTabCounts(),
-  });
-  req.session.clinicFlash = null;
-});
-
-// POST /admin/clinic/:username/password
-app.post('/admin/clinic/:username/password', requireAdmin, async (req, res) => {
-  const { username } = req.params;
-  const { new_password } = req.body;
-
-  if (!new_password || new_password.length < 8) {
-    req.session.clinicFlash = { type: 'error', message: 'Password must be at least 8 characters.' };
-    return res.redirect('/admin/clinic');
-  }
-
-  const account = await db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
-  if (!account) {
-    req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
-    return res.redirect('/admin/clinic');
-  }
-
-  const hash = await bcrypt.hash(new_password, 12);
-  await db.prepare('UPDATE bmdlogin SET pwd = ? WHERE username = ?').run(hash, username);
-  console.log(`[Admin] Password hashed and updated for clinic account: ${username}`);
-  req.session.clinicFlash = { type: 'success', message: `Password for "${username}" updated successfully.` };
-  res.redirect('/admin/clinic');
-});
-
-// POST /admin/clinic/:username/settings
-app.post('/admin/clinic/:username/settings', requireAdmin, async (req, res) => {
-  const { username } = req.params;
-  const { expirydate, limitavailable } = req.body;
-
-  const limit = parseInt(limitavailable, 10);
-  if (isNaN(limit) || limit < 0) {
-    req.session.clinicFlash = { type: 'error', message: 'Scan limit must be a non-negative whole number.' };
-    return res.redirect('/admin/clinic');
-  }
-
-  // Validate date format (YYYY-MM-DD) if provided
-  if (expirydate && !/^\d{4}-\d{2}-\d{2}$/.test(expirydate)) {
-    req.session.clinicFlash = { type: 'error', message: 'Expiry date must be in YYYY-MM-DD format.' };
-    return res.redirect('/admin/clinic');
-  }
-
-  const account = await db.prepare('SELECT id FROM bmdlogin WHERE username = ?').get(username);
-  if (!account) {
-    req.session.clinicFlash = { type: 'error', message: `Account "${username}" not found.` };
-    return res.redirect('/admin/clinic');
-  }
-
-  await db.prepare('UPDATE bmdlogin SET expirydate = ?, limitavailable = ? WHERE username = ?')
-    .run(expirydate || null, limit, username);
-  console.log(`[Admin] Settings updated for clinic account: ${username} (expiry=${expirydate}, limit=${limit})`);
-  req.session.clinicFlash = { type: 'success', message: `Settings for "${username}" saved.` };
-  res.redirect('/admin/clinic');
-});
+// Note: the admin panel is view/analytics-only now that BMD is free/public —
+// clinic account management (create, disable, password reset) retired along
+// with clinic logins. Historical bmdlogin rows are untouched in the database,
+// just no longer surfaced or editable here.
 
 // GET /admin/analytics — marketing funnel, daily trend, and revenue metrics
 app.get('/admin/analytics', requireAdmin, async (req, res) => {
@@ -1732,7 +1340,24 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
     pct: i === 0 ? 100 : (stages[i - 1].count ? Math.round((s.count / stages[i - 1].count) * 100) : 0),
   }));
 
-  // Daily series, last 30 days (signups and orders merged by day)
+  // BMD calculator metrics — free/public since the login gate was retired
+  const bmdTotal      = await one('SELECT COUNT(*) AS c FROM bmd');
+  const bmdPublic     = await one("SELECT COUNT(*) AS c FROM bmd WHERE source = 'public'");
+  const bmdClinic     = await one("SELECT COUNT(*) AS c FROM bmd WHERE source = 'clinic'");
+  const bmdWithEmail  = await one("SELECT COUNT(*) AS c FROM bmd WHERE email IS NOT NULL AND email != ''");
+  const bmdClassRows  = await db.prepare(
+    "SELECT classification, COUNT(*) AS c FROM bmd WHERE classification IS NOT NULL GROUP BY classification"
+  ).all();
+  const classCounts = { Normal: 0, Osteopenia: 0, Osteoporosis: 0 };
+  for (const r of bmdClassRows) if (r.classification in classCounts) classCounts[r.classification] = r.c;
+  const bmdClassified = classCounts.Normal + classCounts.Osteopenia + classCounts.Osteoporosis;
+  const bmdDistribution = ['Normal', 'Osteopenia', 'Osteoporosis'].map(name => ({
+    name,
+    count: classCounts[name],
+    pct: bmdClassified ? Math.round((classCounts[name] / bmdClassified) * 100) : 0,
+  }));
+
+  // Daily series, last 30 days (signups, orders, and BMD tests merged by day)
   const signupsByDay = await db.prepare(
     "SELECT date(created_at) AS day, COUNT(*) AS signups FROM consumers WHERE created_at >= datetime('now','-30 day') GROUP BY day"
   ).all();
@@ -1742,14 +1367,18 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
     "SUM(CASE WHEN status='paid' THEN amount_paise ELSE 0 END) AS revenue_paise " +
     "FROM consumer_orders WHERE created_at >= datetime('now','-30 day') GROUP BY day"
   ).all();
+  const bmdByDay = await db.prepare(
+    "SELECT date(created_at) AS day, COUNT(*) AS bmd_tests FROM bmd WHERE created_at >= datetime('now','-30 day') GROUP BY day"
+  ).all();
 
   const byDay = new Map();
   const rowFor = (day) => {
-    if (!byDay.has(day)) byDay.set(day, { day, signups: 0, orders: 0, paid: 0, revenue_paise: 0 });
+    if (!byDay.has(day)) byDay.set(day, { day, signups: 0, orders: 0, paid: 0, revenue_paise: 0, bmd_tests: 0 });
     return byDay.get(day);
   };
   for (const r of signupsByDay) rowFor(r.day).signups = r.signups;
   for (const r of ordersByDay) Object.assign(rowFor(r.day), { orders: r.orders, paid: r.paid || 0, revenue_paise: r.revenue_paise || 0 });
+  for (const r of bmdByDay) rowFor(r.day).bmd_tests = r.bmd_tests;
   const daily = [...byDay.values()].sort((a, b) => (a.day < b.day ? 1 : -1));
 
   if (req.query.export === 'csv') {
@@ -1759,6 +1388,7 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
       { key: 'orders',        label: 'Orders Created' },
       { key: 'paid',          label: 'Orders Paid' },
       { key: 'revenue_paise', label: 'Revenue (paise)' },
+      { key: 'bmd_tests',     label: 'BMD Tests' },
     ], daily);
   }
 
@@ -1769,6 +1399,11 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
     verifiedUsers,
     ordersPaid,
     revenuePaise,
+    bmdTotal,
+    bmdPublic,
+    bmdClinic,
+    bmdWithEmail,
+    bmdDistribution,
     ...await getTabCounts(),
   });
 });

@@ -1,5 +1,5 @@
 <%- include('partials/header', {
-  pageTitle: 'BMD Records',
+  pageTitle: 'BMD Results',
   activeTab: 'bmd',
   userCount: locals.userCount || 0,
   orderCount: locals.orderCount || 0,
@@ -11,13 +11,21 @@
 
   <div class="adm-stats">
     <div class="adm-stat">
-      <div class="adm-stat-label">BMD Records (in progress)</div>
+      <div class="adm-stat-label">Total BMD Tests</div>
       <div class="adm-stat-value"><%= records.length %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Public (no login)</div>
+      <div class="adm-stat-value"><%= records.filter(function(r){ return r.source !== 'clinic'; }).length %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Legacy Clinic</div>
+      <div class="adm-stat-value"><%= records.filter(function(r){ return r.source === 'clinic'; }).length %></div>
     </div>
   </div>
 
   <div class="adm-section-header">
-    <h1 class="adm-section-title">BMD Records</h1>
+    <h1 class="adm-section-title">BMD Results</h1>
     <div class="adm-section-spacer"></div>
     <div class="adm-search">
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -34,38 +42,49 @@
       <thead>
         <tr>
           <th>#</th>
-          <th>Patient Name</th>
+          <th>Name</th>
           <th>Age</th>
-          <th>Height (cm)</th>
-          <th>Weight (kg)</th>
-          <th>HAL</th>
-          <th>NSA (°)</th>
-          <th class="hide-mobile">Session ID</th>
+          <th class="hide-mobile">Height (cm)</th>
+          <th class="hide-mobile">Weight (kg)</th>
+          <th>Classification</th>
+          <th>Source</th>
+          <th class="hide-mobile">Email</th>
+          <th class="hide-mobile">Date</th>
         </tr>
       </thead>
       <tbody>
         <% if (records.length === 0) { %>
-          <tr><td colspan="8" class="adm-empty">No pending BMD records. Records are deleted after results are shown to the clinic user.</td></tr>
+          <tr><td colspan="9" class="adm-empty">No BMD tests yet.</td></tr>
         <% } %>
         <% records.forEach(function(r) { %>
+        <%
+          const badgeClass = r.classification === 'Normal' ? 'badge-green'
+            : r.classification === 'Osteopenia' ? 'badge-yellow'
+            : r.classification === 'Osteoporosis' ? 'badge-red'
+            : 'badge-grey';
+        %>
         <tr>
           <td class="mono"><%= r.id %></td>
           <td><strong><%= r.name || '—' %></strong></td>
           <td><%= r.age || '—' %></td>
-          <td><%= r.height || '—' %></td>
-          <td><%= r.weight || '—' %></td>
-          <td><%= r.hal || '—' %></td>
-          <td><%= r.nsa || '—' %></td>
-          <td class="mono hide-mobile" style="font-size:11px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= r.guid || '—' %></td>
+          <td class="hide-mobile"><%= r.height || '—' %></td>
+          <td class="hide-mobile"><%= r.weight || '—' %></td>
+          <td><span class="badge <%= badgeClass %>"><%= r.classification || '—' %></span></td>
+          <td>
+            <% if (r.source === 'clinic') { %>
+              <span class="badge badge-grey">Legacy Clinic<% if (r.clinic_username) { %> · <%= r.clinic_username %><% } %></span>
+            <% } else { %>
+              <span class="badge badge-blue">Public</span>
+            <% } %>
+          </td>
+          <td class="hide-mobile"><%= r.email || '—' %></td>
+          <td class="mono hide-mobile"><%= r.created_at ? r.created_at.slice(0,16).replace('T',' ') : '—' %></td>
         </tr>
         <% }); %>
       </tbody>
     </table>
   </div>
 
-  <p style="margin-top:16px;font-size:12px;color:#94A3B8;">
-    BMD records are deleted immediately after the clinic result is computed. Only records from incomplete sessions appear here.
-  </p>
 </div>
 
 <script>

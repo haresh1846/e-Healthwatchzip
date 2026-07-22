@@ -3,7 +3,7 @@
 A women's health platform — converted from Classic ASP to Node.js/Express — with two products:
 
 - **Menopause Forecasting** (consumer): free account → up to 3 profiles → ₹49 one-time payment per test (Razorpay) → result stored permanently, viewable and printable any time.
-- **BMD Calculator** (clinic-licensed): login-gated Bone Mineral Density calculator with per-account scan limits, expiry dates, history, and printable reports.
+- **BMD Calculator**: free, public, no account needed — instant result with a WHO classification (Normal / Osteopenia / Osteoporosis) and a printable report. An optional email lets a visitor get their result sent to them.
 
 ## Stack
 
@@ -80,22 +80,24 @@ ehealthwatch.db   # SQLite database (auto-created on first run; gitignored)
 | `/orders` | Order history with receipts |
 | `POST /razorpay-webhook` | Razorpay webhook (HMAC-verified, source of truth for payment status) |
 
-### BMD clinic
+### BMD Calculator (free, public — no login)
 | URL | Description |
 |-----|-------------|
-| `/bmdlogin.asp` | Clinic login (rate-limited; default credentials force a password change at `/clinic-password`) |
-| `/clinic-dashboard` | Scan usage, recent records, expiry warning |
-| `/bmd.asp`, `/bmdsave.asp`, `/result.asp` | BMD calculator flow |
-| `/bmd-history`, `/bmd-patient/:name`, `/bmd-report/:id` | History, per-patient view, printable report |
-| `/logout.asp` | Logout |
+| `/bmd.asp` | Calculator form (name, age, height, weight, HAL, NSA, optional email) |
+| `/bmdsave.asp` | Computes and stores the result (rate-limited per IP) |
+| `/result.asp` | Result page (session-scoped to the visitor who just submitted) |
+| `/bmd-report/:guid` | Printable report, identified by the test's private `guid` (not a sequential id) so results can't be enumerated |
 
-### Admin panel (`ADMIN_PASSWORD` required)
+Retired: clinic login, scan limits, and per-clinic history. Old URLs (`/bmdlogin.asp`, `/clinic-dashboard`, `/clinic-password`, `/bmd-history`, `/bmd-patient/:name`) redirect to `/bmd.asp` rather than 404ing. The `bmdlogin` table and any historical `clinic_username`-tagged rows are kept, not deleted — they're just no longer used for authentication.
+
+### Admin panel (`ADMIN_PASSWORD` required) — view + analytics only, no editing
 | URL | Description |
 |-----|-------------|
 | `/admin/login` | Admin login (timing-safe compare, rate-limited) |
-| `/admin/users`, `/admin/orders`, `/admin/results`, `/admin/bmd` | Data views, each with CSV export |
-| `/admin/clinic` | Clinic accounts: create, disable/re-enable, change password (bcrypt, min 8 chars), expiry & scan limits |
-| `/admin/analytics` | Marketing analytics: signup→profile→order→paid funnel, revenue, last-30-days daily trend, CSV export |
+| `/admin/users`, `/admin/orders`, `/admin/results`, `/admin/bmd` | Data views, each with CSV export. `/admin/bmd` shows Source (public/legacy clinic), Classification, and optional email per test. |
+| `/admin/analytics` | Funnel, revenue, and BMD test-volume/classification analytics, CSV export |
+
+The one action that isn't pure viewing: `POST /admin/orders/:id/resend-receipt` re-sends a paid order's receipt email (with PDF attachments) — it doesn't edit any stored data.
 
 ## Deploying on Vercel (free tier) + Turso
 
@@ -143,21 +145,11 @@ SELECT SUM(email_verified) * 100.0 / COUNT(*) AS verified_pct FROM consumers;
 ## Security notes
 
 - All queries are parameterized (better-sqlite3 prepared statements).
-- All passwords bcrypt-hashed (cost 12); legacy plaintext clinic passwords are migrated on startup and on login.
+- All passwords bcrypt-hashed (cost 12); any legacy plaintext clinic passwords still on file are migrated to hashes on startup.
 - CSRF token required on every POST (except the HMAC-verified Razorpay webhook).
 - Session cookie: `httpOnly`, `sameSite=lax`, `secure` on HTTPS (behind `trust proxy`).
 - Login/signup/reset endpoints rate-limited (10 attempts / 15 min per IP).
 - Payment fulfillment only after server-side signature verification; webhook validates amount/currency and is idempotent.
-
-## Default BMD Login
-
-The database is seeded with a default clinic account on first run:
-
-| Username | Password |
-|----------|----------|
-| `admin`  | `admin123` |
-
-Logging in with these credentials forces an immediate password change before any clinic page can be used.
 
 ## Medical Formulas (preserved from original)
 
