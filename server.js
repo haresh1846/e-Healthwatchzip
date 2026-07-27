@@ -1074,6 +1074,38 @@ app.get('/forecast-report/:profileId', requireConsumer, async (req, res) => {
   });
 });
 
+// Direct PDF download of a stored forecast result — reuses the same pdfkit
+// renderer already proven in production for the emailed report attachment
+// (buildForecastReportPdf), rather than adding a Puppeteer/Chromium
+// dependency just to print an HTML page.
+app.get('/forecast-report/:profileId/pdf', requireConsumer, async (req, res) => {
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+  if (!profile) return res.redirect('/dashboard');
+  const paidOrder = await db.prepare('SELECT * FROM consumer_orders WHERE profile_id = ? AND status = ? ORDER BY paid_at DESC LIMIT 1').get(profile.id, 'paid');
+  if (!paidOrder) return res.redirect('/profile/' + profile.id);
+  const row = await db.prepare('SELECT * FROM mp_results_v2 WHERE order_id = ?').get(paidOrder.id);
+  if (!row) return res.redirect('/profile/' + profile.id);
+
+  const input  = JSON.parse(row.input_json);
+  const result = JSON.parse(row.result_json);
+  const { yearsToOnset, interpNote } = computeForecastInterpretation(input, result);
+
+  const dateFmt = { day: 'numeric', month: 'long', year: 'numeric' };
+  const pdf = await buildForecastReportPdf({
+    profileName: profile.display_name,
+    relationshipLabel: profile.relationship_label,
+    input, result, yearsToOnset, interpNote,
+    testDate:  new Date(row.created_at).toLocaleDateString('en-IN', dateFmt),
+    printDate: new Date().toLocaleDateString('en-IN', dateFmt),
+  });
+
+  res.set({
+    'Content-Type': 'application/pdf',
+    'Content-Disposition': `attachment; filename=forecast-report-${profile.id}.pdf`,
+  });
+  res.send(pdf);
+});
+
 // ─── Menopause Forecasting (legacy public form) ───────────────────────────────
 
 // Menopause Forecasting – GET (gate landing)
