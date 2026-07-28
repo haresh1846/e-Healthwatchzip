@@ -741,10 +741,10 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 
 /* ── Page illustrations (inner pages) ──────────────────────────── */
 .page-illus-wrap {
-  float:right; margin:0 0 28px 36px; max-width:360px;
-  border-radius:28px; overflow:hidden;
+  float:right; margin:0 0 28px 36px; max-width:360px; width:100%;
+  aspect-ratio: 1 / 1; border-radius:28px; overflow:hidden;
 }
-.page-illus { width:100%; display:block; }
+.page-illus { width:100%; height:100%; object-fit:cover; display:block; }
 @media (max-width:768px) {
   .page-illus-wrap { float:none; margin:0 0 24px; max-width:100%; }
 }
@@ -1382,6 +1382,8 @@ textarea.ehw-contact__input { height:120px;resize:none; }
 .fc-gate-hero__img-wrap { flex-shrink: 0; }
 .fc-gate-hero__img {
   width: 320px;
+  height: 320px;
+  aspect-ratio: 1 / 1;
   border-radius: 20px;
   box-shadow: 0 12px 40px rgba(0,0,0,.10);
   object-fit: cover;
