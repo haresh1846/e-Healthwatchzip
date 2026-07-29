@@ -50,6 +50,14 @@ async function freshSession(pagePath) {
   return { cookie, token };
 }
 
+// GET a page with an existing (already-authenticated) session cookie and
+// pull out the CSRF token minted for that session.
+async function tokenFor(pagePath, cookie) {
+  const r = await fetch(BASE + pagePath, { headers: { cookie } });
+  const html = await r.text();
+  return html.match(/name="_csrf" value="([^"]+)"/)[1];
+}
+
 async function post(pagePath, cookie, body) {
   return fetch(BASE + pagePath, {
     method: 'POST',
@@ -255,6 +263,95 @@ async function test(name, fn) {
       last = await post('/admin/login', cookie, { _csrf: token, password: 'wrong' });
     }
     assert.equal(last.status, 429);
+  });
+
+  // ─── Menopause-forecast pre-payment gate check ──────────────────────────
+  // The forecast formula depends only on AMH, not current age, so a low-AMH
+  // older woman can get a "forecast" age already in her past. /precheck must
+  // catch that before any Razorpay order is created.
+  let precheckProfileId;
+
+  await test('7. Setup: create a profile for the precheck tests', async () => {
+    const token = await tokenFor('/profile/new', consumerCookie);
+    const r = await post('/profile/new', consumerCookie, {
+      _csrf: token, display_name: 'Precheck Test Profile', relationship_label: 'Self',
+    });
+    assert.equal(r.status, 302);
+    precheckProfileId = r.headers.get('location').split('/').pop();
+    assert.ok(precheckProfileId, 'profile creation must redirect to /profile/:id');
+  });
+
+  await test('7a. Precheck: normal case (forecast_age > age) still proceeds to payment as before', async () => {
+    const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    const r = await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
+      _csrf: token, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
+    });
+    assert.equal(r.status, 200);
+    const data = await r.json();
+    assert.equal(data.gate, 'proceed_to_payment');
+    assert.ok(data.forecastAge > 30, `expected forecastAge > 30, got ${data.forecastAge}`);
+
+    // The existing order-creation route (refactored to share validation logic)
+    // must still behave exactly as before for the same valid inputs.
+    const orderToken = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    const orderPost = await post(`/forecast/${precheckProfileId}`, consumerCookie, {
+      _csrf: orderToken, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
+    });
+    assert.equal(orderPost.status, 200);
+    const html = await orderPost.text();
+    // No validation error was raised for these valid inputs — the shared
+    // validateForecastInputs() refactor didn't change accepted behavior.
+    // (It proceeds to attempt Razorpay order creation next, which fails only
+    // because this test environment has no Razorpay keys configured — an
+    // existing, pre-refactor condition unrelated to this change.)
+    assert.ok(!html.includes('Please enter a valid'));
+    assert.ok(html.includes('Payments are not configured on this server'));
+  });
+
+  await test('7b. Precheck: edge case (forecast_age <= age) is gated and never reaches Razorpay order creation', async () => {
+    const ordersBefore = db.prepare('SELECT COUNT(*) AS c FROM consumer_orders WHERE profile_id = ?').get(precheckProfileId).c;
+
+    const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    // 45yo, AMH 0.89, irregular cycles → forecast_age = round(41.41 * 0.89^0.17) = 41, which is <= 45.
+    const r = await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
+      _csrf: token, Txt_age: '45', cmbperiods: 'I', Txt_amh: '0.89',
+    });
+    assert.equal(r.status, 200);
+    const data = await r.json();
+    assert.equal(data.gate, 'already_menopausal');
+
+    const ordersAfter = db.prepare('SELECT COUNT(*) AS c FROM consumer_orders WHERE profile_id = ?').get(precheckProfileId).c;
+    assert.equal(ordersAfter, ordersBefore, 'precheck must never create a Razorpay order row');
+  });
+
+  await test('7c. Precheck does not persist any result record', async () => {
+    const before = db.prepare('SELECT COUNT(*) AS c FROM mp_results_v2 WHERE profile_id = ?').get(precheckProfileId).c;
+    const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
+      _csrf: token, Txt_age: '45', cmbperiods: 'I', Txt_amh: '0.89',
+    });
+    const after = db.prepare('SELECT COUNT(*) AS c FROM mp_results_v2 WHERE profile_id = ?').get(precheckProfileId).c;
+    assert.equal(after, before, 'precheck is a gate check only — it must never write a result row');
+  });
+
+  await test('7d. Precheck respects rate limiting', async () => {
+    const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    let last;
+    for (let i = 0; i < 11; i++) {
+      last = await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
+        _csrf: token, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
+      });
+    }
+    assert.equal(last.status, 429);
+  });
+
+  await test('7e. Precheck rejects unauthenticated requests (same as /forecast/:profileId)', async () => {
+    const { cookie, token } = await freshSession('/bmd.asp'); // valid CSRF, no consumer login
+    const r = await post(`/forecast/${precheckProfileId}/precheck`, cookie, {
+      _csrf: token, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
+    });
+    assert.equal(r.status, 302);
+    assert.ok(r.headers.get('location').startsWith('/login'), `expected redirect to /login, got ${r.headers.get('location')}`);
   });
 
   serverProc.kill();

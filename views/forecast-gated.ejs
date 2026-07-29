@@ -103,6 +103,83 @@
               🔒 Secure · No subscription · Result stored permanently on your profile
             </p>
           </form>
+
+          <!-- Confirmation modal: shown before the intake form is submitted -->
+          <div id="confirmModal" class="fc-confirm-overlay" style="display:none;">
+            <div class="fc-confirm-modal">
+              <h3>Please confirm your details before proceeding</h3>
+              <div class="fc-confirm-row"><span>Age</span><strong id="confirmAge"></strong></div>
+              <div class="fc-confirm-row"><span>AMH</span><strong id="confirmAmh"></strong></div>
+              <div class="fc-confirm-row"><span>Cycle</span><strong id="confirmCycle"></strong></div>
+              <p id="confirmError" class="auth-alert" style="display:none;"></p>
+              <div class="fc-confirm-actions">
+                <button type="button" id="confirmEditBtn" class="fc-confirm-btn-secondary">Edit</button>
+                <button type="button" id="confirmContinueBtn" class="auth-submit" style="width:auto;">Confirm &amp; Continue</button>
+              </div>
+            </div>
+          </div>
+
+          <script>
+            (function () {
+              var form = document.getElementById('forecastForm');
+              if (!form) return;
+              var modal       = document.getElementById('confirmModal');
+              var confirmBtn  = document.getElementById('confirmContinueBtn');
+              var editBtn     = document.getElementById('confirmEditBtn');
+              var errorEl     = document.getElementById('confirmError');
+
+              form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                if (!form.checkValidity()) { form.reportValidity(); return; }
+
+                document.getElementById('confirmAge').textContent   = form.Txt_age.value + ' yrs';
+                document.getElementById('confirmAmh').textContent   = form.Txt_amh.value + ' ng/mL';
+                document.getElementById('confirmCycle').textContent = form.cmbperiods.value === 'R' ? 'Regular' : 'Irregular';
+                errorEl.style.display = 'none';
+                modal.style.display = 'flex';
+              });
+
+              editBtn.addEventListener('click', function () {
+                modal.style.display = 'none';
+              });
+
+              confirmBtn.addEventListener('click', function () {
+                confirmBtn.disabled = true;
+                confirmBtn.textContent = 'Checking…';
+                errorEl.style.display = 'none';
+
+                var csrfToken = form.querySelector('[name=_csrf]').value;
+
+                fetch(form.action + '/precheck', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                  body: JSON.stringify({
+                    Txt_age:     form.Txt_age.value,
+                    cmbperiods:  form.cmbperiods.value,
+                    Txt_amh:     form.Txt_amh.value,
+                  }),
+                })
+                  .then(function (r) {
+                    if (!r.ok) throw new Error('precheck-failed');
+                    return r.json();
+                  })
+                  .then(function (data) {
+                    if (data.gate === 'already_menopausal') {
+                      window.location.href = '/already-menopausal';
+                    } else {
+                      form.submit();
+                    }
+                  })
+                  .catch(function () {
+                    errorEl.textContent = 'Something went wrong checking your details. Please try again.';
+                    errorEl.style.display = 'block';
+                    confirmBtn.disabled = false;
+                    confirmBtn.textContent = 'Confirm & Continue';
+                  });
+              });
+            })();
+          </script>
+
           <% } else { %>
 
           <!-- Step 2: Order created — show summary + trigger Razorpay widget -->

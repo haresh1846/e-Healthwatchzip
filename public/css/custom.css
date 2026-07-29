@@ -1487,3 +1487,36 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   /* Page margins */
   @page { margin: 18mm 16mm; }
 }
+
+/* ── Forecast intake confirmation modal ──────────────────────────── */
+.fc-confirm-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(41,37,36,.45);
+  align-items: center; justify-content: center;
+  padding: 20px;
+}
+.fc-confirm-modal {
+  background: var(--cream); border-radius: 20px;
+  padding: 32px 28px; max-width: 380px; width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.fc-confirm-modal h3 {
+  font-family: var(--font-serif); font-size: 19px; color: var(--stone-dark);
+  margin-bottom: 20px; line-height: 1.35;
+}
+.fc-confirm-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--stone-100);
+  font-size: 14px; color: var(--stone);
+}
+.fc-confirm-row:last-of-type { border-bottom: none; }
+.fc-confirm-row strong { color: var(--stone-dark); font-size: 15px; }
+.fc-confirm-actions { display: flex; gap: 10px; margin-top: 24px; }
+.fc-confirm-btn-secondary {
+  flex: 1; background: transparent; border: 1.5px solid var(--stone-200);
+  border-radius: 14px; padding: 15px 20px; font-family: var(--font-sans);
+  font-size: 15px; font-weight: 700; color: var(--stone-dark); cursor: pointer;
+  transition: border-color .18s, background .18s;
+}
+.fc-confirm-btn-secondary:hover { border-color: var(--stone-400); background: var(--stone-50); }
+.fc-confirm-actions .auth-submit { flex: 1; }
