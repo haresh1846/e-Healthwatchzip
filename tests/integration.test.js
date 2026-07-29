@@ -283,13 +283,17 @@ async function test(name, fn) {
 
   await test('7a. Precheck: normal case (forecast_age > age) still proceeds to payment as before', async () => {
     const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    // age=30, amh=3.0, regular → forecast_age = round(35.49 * 3.0^0.15) = 42, which is > 30.
     const r = await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
       _csrf: token, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
     });
     assert.equal(r.status, 200);
     const data = await r.json();
     assert.equal(data.gate, 'proceed_to_payment');
-    assert.ok(data.forecastAge > 30, `expected forecastAge > 30, got ${data.forecastAge}`);
+    // forecastAge is deliberately never included in this response — it must
+    // not be visible pre-payment (see 7f). The real value is computed again,
+    // server-side, at /verify after payment succeeds.
+    assert.equal(data.forecastAge, undefined, 'precheck must not leak the computed forecast age pre-payment');
 
     // The existing order-creation route (refactored to share validation logic)
     // must still behave exactly as before for the same valid inputs.
@@ -352,6 +356,15 @@ async function test(name, fn) {
     });
     assert.equal(r.status, 302);
     assert.ok(r.headers.get('location').startsWith('/login'), `expected redirect to /login, got ${r.headers.get('location')}`);
+  });
+
+  await test('7f. Precheck response never contains the computed forecast age, even as raw text', async () => {
+    const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    const r = await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
+      _csrf: token, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
+    });
+    const raw = await r.text();
+    assert.ok(!raw.toLowerCase().includes('forecastage'), `precheck response leaked forecast data: ${raw}`);
   });
 
   serverProc.kill();

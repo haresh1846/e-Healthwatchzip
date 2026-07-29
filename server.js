@@ -833,7 +833,10 @@ app.post('/forecast/:profileId/precheck', requireConsumer, async (req, res) => {
   if (forecastAge <= ageNum) {
     return res.json({ gate: 'already_menopausal' });
   }
-  return res.json({ gate: 'proceed_to_payment', forecastAge });
+  // Deliberately omit forecastAge here — this is a paywall gate check, and
+  // the paid result page + PDF are the only place a customer should see the
+  // computed forecast. It's independently recomputed at /verify after payment.
+  return res.json({ gate: 'proceed_to_payment' });
 });
 
 // Step 1: Validate form inputs → create Razorpay order → re-render with widget data
