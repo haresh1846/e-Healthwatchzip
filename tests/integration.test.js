@@ -338,6 +338,32 @@ async function test(name, fn) {
     assert.equal(after, before, 'precheck is a gate check only — it must never write a result row');
   });
 
+  await test('7g. Gated (already_menopausal) hits are logged as a forecast_gate_leads row', async () => {
+    const before = db.prepare('SELECT COUNT(*) AS c FROM forecast_gate_leads WHERE profile_id = ?').get(precheckProfileId).c;
+    const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
+      _csrf: token, Txt_age: '45', cmbperiods: 'I', Txt_amh: '0.89',
+    });
+    const after = db.prepare('SELECT COUNT(*) AS c FROM forecast_gate_leads WHERE profile_id = ?').get(precheckProfileId).c;
+    assert.equal(after, before + 1, 'a gated hit must be logged for follow-up');
+
+    const row = db.prepare('SELECT * FROM forecast_gate_leads WHERE profile_id = ? ORDER BY id DESC LIMIT 1').get(precheckProfileId);
+    assert.equal(row.age, '45');
+    assert.equal(row.amh, '0.89');
+    assert.equal(row.cycle_regularity, 'I');
+    assert.equal(row.forecast_age, 41);
+  });
+
+  await test('7h. Normal (proceed_to_payment) hits do NOT create a forecast_gate_leads row', async () => {
+    const before = db.prepare('SELECT COUNT(*) AS c FROM forecast_gate_leads WHERE profile_id = ?').get(precheckProfileId).c;
+    const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
+    await post(`/forecast/${precheckProfileId}/precheck`, consumerCookie, {
+      _csrf: token, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
+    });
+    const after = db.prepare('SELECT COUNT(*) AS c FROM forecast_gate_leads WHERE profile_id = ?').get(precheckProfileId).c;
+    assert.equal(after, before, 'a normal, payable forecast must not be logged as a lead');
+  });
+
   await test('7d. Precheck respects rate limiting', async () => {
     const token = await tokenFor('/forecast/' + precheckProfileId, consumerCookie);
     let last;

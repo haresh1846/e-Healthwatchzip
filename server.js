@@ -814,7 +814,10 @@ app.get('/forecast/:profileId', requireConsumer, async (req, res) => {
 // not current age, so a low-AMH older woman can get a "forecast" age that's
 // already in her past. Confirmed intake values are checked here, before any
 // Razorpay order is created, so that case never reaches payment. This is a
-// gate check only: nothing is persisted, no PDF/email/result record.
+// paywall gate check only — no order, no PDF, no email, no paid result row.
+// The one exception is the "already_menopausal" branch: that's logged as a
+// lead (forecast_gate_leads) so the team can follow up, since the tool has
+// nothing to sell that visitor and would otherwise lose the contact entirely.
 app.post('/forecast/:profileId/precheck', requireConsumer, async (req, res) => {
   const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.status(404).json({ error: 'Profile not found.' });
@@ -831,6 +834,9 @@ app.post('/forecast/:profileId/precheck', requireConsumer, async (req, res) => {
   const ageNum = parseFloat(Txt_age);
 
   if (forecastAge <= ageNum) {
+    await db.prepare(
+      'INSERT INTO forecast_gate_leads (consumer_id, profile_id, age, amh, cycle_regularity, forecast_age) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(req.session.consumerId, profile.id, Txt_age, Txt_amh, cmbperiods, forecastAge);
     return res.json({ gate: 'already_menopausal' });
   }
   // Deliberately omit forecastAge here — this is a paywall gate check, and
@@ -1228,6 +1234,7 @@ async function getTabCounts() {
     orderCount:  (await db.prepare('SELECT COUNT(*) as c FROM consumer_orders').get() || {}).c || 0,
     resultCount: (await db.prepare('SELECT COUNT(*) as c FROM mp_results_v2').get() || {}).c || 0,
     bmdCount:    (await db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
+    leadCount:   (await db.prepare('SELECT COUNT(*) as c FROM forecast_gate_leads').get() || {}).c || 0,
   };
 }
 
@@ -1390,6 +1397,36 @@ app.get('/admin/bmd', requireAdmin, async (req, res) => {
   }
 
   res.render('admin/bmd', { records, ...await getTabCounts() });
+});
+
+// GET /admin/forecast-leads — visitors the menopause forecast had nothing
+// forward-looking to offer (forecast_age <= age), for manual follow-up.
+app.get('/admin/forecast-leads', requireAdmin, async (req, res) => {
+  const leads = await db.prepare(`
+    SELECT l.id, l.age, l.amh, l.cycle_regularity, l.forecast_age, l.created_at,
+           c.full_name as consumer_name, c.email as consumer_email,
+           p.display_name as profile_name
+    FROM forecast_gate_leads l
+    LEFT JOIN consumers c ON c.id = l.consumer_id
+    LEFT JOIN consumer_profiles p ON p.id = l.profile_id
+    ORDER BY l.id DESC
+  `).all();
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'forecast-gate-leads.csv', [
+      { key: 'id',               label: 'ID' },
+      { key: 'consumer_name',    label: 'Consumer Name' },
+      { key: 'consumer_email',   label: 'Consumer Email' },
+      { key: 'profile_name',     label: 'Profile' },
+      { key: 'age',              label: 'Age' },
+      { key: 'amh',              label: 'AMH (ng/mL)' },
+      { key: 'cycle_regularity', label: 'Cycle' },
+      { key: 'forecast_age',     label: 'Computed Forecast Age' },
+      { key: 'created_at',       label: 'Date' },
+    ], leads);
+  }
+
+  res.render('admin/forecast-leads', { leads, ...await getTabCounts() });
 });
 
 // Note: the admin panel is view/analytics-only now that BMD is free/public —

@@ -142,6 +142,23 @@ async function init() {
       FOREIGN KEY (profile_id) REFERENCES consumer_profiles(id)
     );
 
+    -- Menopause-forecast pre-payment gate hits: recorded only when the
+    -- formula has nothing forward-looking to offer (forecast_age <= age).
+    -- Never linked to a paid order/result — this is a lead-tracking record
+    -- for follow-up, not a purchased deliverable.
+    CREATE TABLE IF NOT EXISTS forecast_gate_leads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      consumer_id INTEGER NOT NULL,
+      profile_id INTEGER NOT NULL,
+      age TEXT,
+      amh TEXT,
+      cycle_regularity TEXT,
+      forecast_age INTEGER,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (consumer_id) REFERENCES consumers(id),
+      FOREIGN KEY (profile_id) REFERENCES consumer_profiles(id)
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       sid        TEXT PRIMARY KEY,
       sess       TEXT NOT NULL,
