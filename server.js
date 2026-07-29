@@ -8,6 +8,7 @@ const Razorpay = require('razorpay');
 const nodemailer = require('nodemailer');
 const { buildReceiptPdf, buildForecastReportPdf, computeForecastInterpretation } = require('./lib/pdf');
 const { computeBmdResult } = require('./lib/bmd');
+const { computeForecastAge, validateForecastInputs } = require('./lib/forecast');
 const { formatOrderNumber } = require('./lib/order-number');
 const db = require('./db');
 const SqliteSessionStore = require('./session-store');
@@ -809,26 +810,41 @@ app.get('/forecast/:profileId', requireConsumer, async (req, res) => {
   res.render('forecast-gated', { profile, error: null, razorpayOrder: null, razorpayKeyId: null });
 });
 
+// Step 0: Pre-payment gate check — the forecast formula depends only on AMH,
+// not current age, so a low-AMH older woman can get a "forecast" age that's
+// already in her past. Confirmed intake values are checked here, before any
+// Razorpay order is created, so that case never reaches payment. This is a
+// gate check only: nothing is persisted, no PDF/email/result record.
+app.post('/forecast/:profileId/precheck', requireConsumer, async (req, res) => {
+  const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
+  if (!profile) return res.status(404).json({ error: 'Profile not found.' });
+
+  if (rateLimited('forecastprecheck:' + req.ip)) {
+    return res.status(429).json({ error: RATE_LIMIT_MESSAGE });
+  }
+
+  const { Txt_age, cmbperiods, Txt_amh } = req.body;
+  const inputError = validateForecastInputs({ Txt_age, cmbperiods, Txt_amh });
+  if (inputError) return res.status(400).json({ error: inputError });
+
+  const { forecastAge } = computeForecastAge(Txt_amh, cmbperiods);
+  const ageNum = parseFloat(Txt_age);
+
+  if (forecastAge <= ageNum) {
+    return res.json({ gate: 'already_menopausal' });
+  }
+  return res.json({ gate: 'proceed_to_payment', forecastAge });
+});
+
 // Step 1: Validate form inputs → create Razorpay order → re-render with widget data
 app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
   const profile = await db.prepare('SELECT * FROM consumer_profiles WHERE id = ? AND consumer_id = ?').get(req.params.profileId, req.session.consumerId);
   if (!profile) return res.redirect('/dashboard');
 
   const { Txt_age, cmbperiods, Txt_amh } = req.body;
-  if (!Txt_age || !cmbperiods || !Txt_amh) {
-    return res.render('forecast-gated', { profile, error: 'All fields are required.', razorpayOrder: null, razorpayKeyId: null });
-  }
-
-  const ageNum = parseFloat(Txt_age);
-  const amhNum = parseFloat(Txt_amh);
-  if (isNaN(ageNum) || ageNum < 18 || ageNum > 60) {
-    return res.render('forecast-gated', { profile, error: 'Please enter a valid age between 18 and 60.', razorpayOrder: null, razorpayKeyId: null });
-  }
-  if (isNaN(amhNum) || amhNum <= 0 || amhNum > 20) {
-    return res.render('forecast-gated', { profile, error: 'Please enter a valid AMH value between 0.01 and 20 ng/mL.', razorpayOrder: null, razorpayKeyId: null });
-  }
-  if (cmbperiods !== 'R' && cmbperiods !== 'I') {
-    return res.render('forecast-gated', { profile, error: 'Please select a menstrual cycle type.', razorpayOrder: null, razorpayKeyId: null });
+  const inputError = validateForecastInputs({ Txt_age, cmbperiods, Txt_amh });
+  if (inputError) {
+    return res.render('forecast-gated', { profile, error: inputError, razorpayOrder: null, razorpayKeyId: null });
   }
 
   // Store form inputs in session for use after payment verification
@@ -957,11 +973,7 @@ app.post('/forecast/:profileId/verify', requireConsumer, async (req, res) => {
         const backfillPending = req.session.pendingForecast;
         if (backfillPending && backfillPending.gatewayOrderId === razorpay_order_id && backfillPending.profileId === profile.id) {
           const { Txt_age: bAge, cmbperiods: bPeriods, Txt_amh: bAmh } = backfillPending;
-          const bb0    = bPeriods === 'R' ? 35.49 : 41.41;
-          const bb1    = bPeriods === 'R' ? 0.15  : 0.17;
-          const bP     = bPeriods === 'R' ? 'Regular' : 'Irregular';
-          const bAmhV  = parseFloat(bAmh);
-          const bFm    = Math.round(bb0 * Math.pow(bAmhV, bb1));
+          const { forecastAge: bFm, periods: bP, amhvalue: bAmhV } = computeForecastAge(bAmh, bPeriods);
           await db.prepare(
             'INSERT OR IGNORE INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES (?, ?, ?, ?)'
           ).run(
@@ -995,11 +1007,7 @@ app.post('/forecast/:profileId/verify', requireConsumer, async (req, res) => {
   }
 
   const { Txt_age, cmbperiods, Txt_amh } = pending;
-  const b0      = cmbperiods === 'R' ? 35.49 : 41.41;
-  const b1      = cmbperiods === 'R' ? 0.15  : 0.17;
-  const periods = cmbperiods === 'R' ? 'Regular' : 'Irregular';
-  const amhvalue = parseFloat(Txt_amh);
-  const fmvalue  = Math.round(b0 * Math.pow(amhvalue, b1));
+  const { forecastAge: fmvalue, periods, amhvalue } = computeForecastAge(Txt_amh, cmbperiods);
 
   // Mark order paid and persist result — both in one atomic batch
   await db.batch([
@@ -1021,6 +1029,13 @@ app.post('/forecast/:profileId/verify', requireConsumer, async (req, res) => {
   req.session.pendingForecast = null;
   sendReceiptEmail(orderRow.id);
   res.redirect('/my-result/' + profile.id);
+});
+
+// Reached when the pre-payment gate check finds the forecast formula has
+// nothing forward-looking to offer (forecast age already in the past
+// relative to current age). Authenticated-only — not a public page.
+app.get('/already-menopausal', requireConsumer, (req, res) => {
+  res.render('already-menopausal');
 });
 
 // Consumer order history
