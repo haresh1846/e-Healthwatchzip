@@ -479,7 +479,7 @@ app.post('/signup', async (req, res) => {
   if (rateLimited('signup:' + req.ip)) {
     return res.status(429).render('signup', { error: RATE_LIMIT_MESSAGE });
   }
-  const { full_name, email, password, confirm_password, consent } = req.body;
+  const { full_name, email, phone, password, confirm_password, consent } = req.body;
   if (!consent)                   return res.render('signup', { error: 'You must accept the privacy policy to continue.' });
   if (!password || password.length < 8) return res.render('signup', { error: 'Password must be at least 8 characters.' });
   if (password !== confirm_password)    return res.render('signup', { error: 'Passwords do not match.' });
@@ -487,7 +487,7 @@ app.post('/signup', async (req, res) => {
     const existing = await db.prepare('SELECT id FROM consumers WHERE email = ?').get(email);
     if (existing) return res.render('signup', { error: 'An account with this email already exists. Sign in instead.' });
     const password_hash = await bcrypt.hash(password, 12);
-    const r = await db.prepare('INSERT INTO consumers (email, password_hash, full_name, consent_given_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null);
+    const r = await db.prepare('INSERT INTO consumers (email, password_hash, full_name, phone, consent_given_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)').run(email, password_hash, full_name || null, (phone || '').trim() || null);
     req.session.consumerId   = r.lastInsertRowid;
     req.session.consumerName = full_name || email.split('@')[0];
     await sendVerificationEmail(req, { id: r.lastInsertRowid, email, full_name });
@@ -1404,7 +1404,7 @@ app.get('/admin/bmd', requireAdmin, async (req, res) => {
 app.get('/admin/forecast-leads', requireAdmin, async (req, res) => {
   const leads = await db.prepare(`
     SELECT l.id, l.age, l.amh, l.cycle_regularity, l.forecast_age, l.created_at,
-           c.full_name as consumer_name, c.email as consumer_email,
+           c.full_name as consumer_name, c.email as consumer_email, c.phone as consumer_phone,
            p.display_name as profile_name
     FROM forecast_gate_leads l
     LEFT JOIN consumers c ON c.id = l.consumer_id
@@ -1417,6 +1417,7 @@ app.get('/admin/forecast-leads', requireAdmin, async (req, res) => {
       { key: 'id',               label: 'ID' },
       { key: 'consumer_name',    label: 'Consumer Name' },
       { key: 'consumer_email',   label: 'Consumer Email' },
+      { key: 'consumer_phone',   label: 'Consumer Phone' },
       { key: 'profile_name',     label: 'Profile' },
       { key: 'age',              label: 'Age' },
       { key: 'amh',              label: 'AMH (ng/mL)' },
@@ -1426,7 +1427,18 @@ app.get('/admin/forecast-leads', requireAdmin, async (req, res) => {
     ], leads);
   }
 
-  res.render('admin/forecast-leads', { leads, ...await getTabCounts() });
+  // wa.me click-to-chat: free, no API/account needed, but still requires a
+  // human in the admin panel to review and press send in WhatsApp itself.
+  const leadsWithWa = leads.map(l => {
+    if (!l.consumer_phone) return { ...l, waLink: null };
+    const digits = String(l.consumer_phone).replace(/\D/g, '');
+    if (!digits) return { ...l, waLink: null };
+    const cycleLabel = l.cycle_regularity === 'R' ? 'Regular' : 'Irregular';
+    const message = `Hi ${l.consumer_name || 'there'}, this is e-healthwatch following up on your Menopause Forecast check for ${l.profile_name || 'your profile'}. Based on the details you shared (age ${l.age}, AMH ${l.amh} ng/mL, ${cycleLabel} cycle), our calculator wasn't able to give a forward-looking forecast right now — this isn't a diagnosis, just a signal from the numbers. We'd recommend speaking with a gynaecologist for a full assessment. Let us know if you'd like help finding one.`;
+    return { ...l, waLink: `https://wa.me/${digits}?text=${encodeURIComponent(message)}` };
+  });
+
+  res.render('admin/forecast-leads', { leads: leadsWithWa, ...await getTabCounts() });
 });
 
 // Note: the admin panel is view/analytics-only now that BMD is free/public —

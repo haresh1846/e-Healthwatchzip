@@ -86,9 +86,11 @@ function seedPlaintextClinicRow() {
   db.close();
 }
 
+const ADMIN_TEST_PASSWORD = 'integration-test-admin-pass';
+
 async function startServer() {
   serverProc = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
-    env: { ...process.env, PORT: String(PORT), DB_PATH, SESSION_SECRET: 'integration-test-secret' },
+    env: { ...process.env, PORT: String(PORT), DB_PATH, SESSION_SECRET: 'integration-test-secret', ADMIN_PASSWORD: ADMIN_TEST_PASSWORD },
   });
   serverProc.stdout.on('data', d => { serverLog += d.toString(); });
   serverProc.stderr.on('data', d => { serverLog += d.toString(); });
@@ -254,6 +256,85 @@ async function test(name, fn) {
     const s2 = await freshSession('/login');
     const good = await post('/login', s2.cookie, { _csrf: s2.token, email, password: 'brandnewpass2' });
     assert.equal(good.headers.get('location'), '/dashboard');
+  });
+
+  // ─── Phone capture + free wa.me click-to-chat follow-up ─────────────────
+  // Placed before test 6 (which deliberately exhausts the admin-login rate
+  // limiter) and before 7d (which does the same for forecast-precheck) —
+  // both buckets are per-IP and shared across the whole test run, so this
+  // block must run first or it would itself get rate-limited.
+  let waConsumerCookie, waPrecheckProfileId, waConsumerPhone;
+  let nophoneConsumerCookie, nophoneProfileId;
+
+  await test('5d. Signup with a phone number persists it', async () => {
+    const { cookie, token } = await freshSession('/signup');
+    const phone = '+91 98765 43210';
+    const r = await post('/signup', cookie, {
+      _csrf: token, email: 'waconsumer@test.local', password: 'wapassword1', confirm_password: 'wapassword1',
+      consent: 'on', full_name: 'WA Consumer', phone,
+    });
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get('location'), '/dashboard');
+    waConsumerCookie = cookie;
+    waConsumerPhone = phone;
+
+    const row = db.prepare('SELECT phone FROM consumers WHERE email = ?').get('waconsumer@test.local');
+    assert.equal(row.phone, phone);
+  });
+
+  await test('5e. Setup: gate a forecast for the phone-enabled consumer', async () => {
+    const token = await tokenFor('/profile/new', waConsumerCookie);
+    const r = await post('/profile/new', waConsumerCookie, {
+      _csrf: token, display_name: 'WA Profile', relationship_label: 'Self',
+    });
+    assert.equal(r.status, 302);
+    waPrecheckProfileId = r.headers.get('location').split('/').pop();
+
+    const pcToken = await tokenFor('/forecast/' + waPrecheckProfileId, waConsumerCookie);
+    const pc = await post(`/forecast/${waPrecheckProfileId}/precheck`, waConsumerCookie, {
+      _csrf: pcToken, Txt_age: '45', cmbperiods: 'I', Txt_amh: '0.89',
+    });
+    const data = await pc.json();
+    assert.equal(data.gate, 'already_menopausal');
+  });
+
+  await test('5f. Setup: gate a forecast for a consumer with no phone on file', async () => {
+    const { cookie, token } = await freshSession('/signup');
+    const r = await post('/signup', cookie, {
+      _csrf: token, email: 'nophoneconsumer@test.local', password: 'nophonepass1', confirm_password: 'nophonepass1',
+      consent: 'on', full_name: 'No Phone Consumer',
+    });
+    assert.equal(r.status, 302);
+    nophoneConsumerCookie = cookie;
+
+    const pToken = await tokenFor('/profile/new', nophoneConsumerCookie);
+    const pr = await post('/profile/new', nophoneConsumerCookie, {
+      _csrf: pToken, display_name: 'No Phone Profile', relationship_label: 'Self',
+    });
+    nophoneProfileId = pr.headers.get('location').split('/').pop();
+
+    const pcToken = await tokenFor('/forecast/' + nophoneProfileId, nophoneConsumerCookie);
+    const pc = await post(`/forecast/${nophoneProfileId}/precheck`, nophoneConsumerCookie, {
+      _csrf: pcToken, Txt_age: '45', cmbperiods: 'I', Txt_amh: '0.89',
+    });
+    const data = await pc.json();
+    assert.equal(data.gate, 'already_menopausal');
+  });
+
+  await test('5g. Admin forecast-leads page: wa.me link when a phone is on file, fallback otherwise', async () => {
+    const { cookie: anonCookie, token: adminToken } = await freshSession('/admin/login');
+    const login = await post('/admin/login', anonCookie, { _csrf: adminToken, password: ADMIN_TEST_PASSWORD });
+    assert.equal(login.status, 302);
+    const setCookie = login.headers.get('set-cookie');
+    const adminCookie = setCookie ? setCookie.split(';')[0] : anonCookie;
+
+    const page = await fetch(BASE + '/admin/forecast-leads', { headers: { cookie: adminCookie } });
+    assert.equal(page.status, 200);
+    const html = await page.text();
+
+    const expectedDigits = waConsumerPhone.replace(/\D/g, '');
+    assert.ok(html.includes(`https://wa.me/${expectedDigits}?text=`), "expected a wa.me link built from the consumer's digits-only phone number");
+    assert.ok(html.includes('No phone on file'), 'expected a fallback for leads with no phone on file');
   });
 
   await test('6. Rate limiter returns 429 after 10 attempts', async () => {

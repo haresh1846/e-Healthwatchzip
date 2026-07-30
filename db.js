@@ -173,6 +173,9 @@ async function init() {
   await addColumn("ALTER TABLE consumers ADD COLUMN verification_token_expires DATETIME");
   await addColumn("ALTER TABLE consumers ADD COLUMN reset_token TEXT");
   await addColumn("ALTER TABLE consumers ADD COLUMN reset_token_expires DATETIME");
+  // Optional phone number, captured at signup, so gated forecast leads can
+  // be followed up with a free wa.me click-to-chat link from the admin panel.
+  await addColumn("ALTER TABLE consumers ADD COLUMN phone TEXT");
   await addColumn("ALTER TABLE bmdlogin ADD COLUMN disabled INTEGER DEFAULT 0");
   await addColumn("ALTER TABLE bmd ADD COLUMN clinic_username TEXT");
   await addColumn("ALTER TABLE bmd ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP");
