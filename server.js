@@ -10,6 +10,7 @@ const { buildReceiptPdf, buildForecastReportPdf, computeForecastInterpretation }
 const { computeBmdResult } = require('./lib/bmd');
 const { computeForecastAge, validateForecastInputs } = require('./lib/forecast');
 const { formatOrderNumber } = require('./lib/order-number');
+const { getContent, DEFAULT_LOCALE } = require('./lib/content');
 const db = require('./db');
 const SqliteSessionStore = require('./session-store');
 
@@ -184,6 +185,15 @@ app.use(session({
 app.use((req, res, next) => {
   res.locals.consumerId   = req.session.consumerId   || null;
   res.locals.consumerName = req.session.consumerName || '';
+  next();
+});
+
+// ─── Content layer ───────────────────────────────────────────────────────────
+// Every template gets the resolved locale bundle as `t`, so copy lives in
+// content/<locale>/ rather than hardcoded in markup. Injected here rather than
+// per-route so no route handler needs to know the content layer exists.
+app.use((req, res, next) => {
+  res.locals.t = getContent(req.query.lang || DEFAULT_LOCALE);
   next();
 });
 

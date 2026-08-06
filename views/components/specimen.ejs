@@ -1,0 +1,33 @@
+<%
+/**
+ * A real result rendered at display size — the product used as its own hero
+ * image. The figure is the largest thing on the page by a wide margin, which
+ * is the point: the number is what someone is paying for.
+ *
+ * @param {import('../../content/schema').SpecimenCard} data
+ * @param {boolean} [prose=false]  Rows carry sentences rather than values.
+ */
+const _prose = locals.prose ? ' specimen--prose' : '';
+%><figure class="specimen<%= _prose %>">
+  <figcaption class="specimen__caption">
+    <span><%= data.caption %></span>
+    <% if (data.band) { %><%- include('./badge', { level: data.band.level, label: data.band.label }) %><% } %>
+  </figcaption>
+
+  <div class="specimen__figure-row">
+    <span class="specimen__figure"><%= data.figure %></span>
+    <span class="specimen__unit"><%= data.figureUnit %></span>
+  </div>
+  <p class="specimen__label"><%= data.figureLabel %></p>
+
+  <dl class="specimen__rows">
+    <% data.rows.forEach(function (row) { %>
+      <div class="specimen__row">
+        <dt><%= row.label %></dt>
+        <dd><%= row.value %></dd>
+      </div>
+    <% }); %>
+  </dl>
+
+  <% if (data.footnote) { %><p class="specimen__footnote"><%= data.footnote %></p><% } %>
+</figure>

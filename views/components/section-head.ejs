@@ -1,0 +1,14 @@
+<%
+/**
+ * Eyebrow + heading + supporting paragraph.
+ * @param {string} [eyebrow]
+ * @param {string} heading
+ * @param {string} [body]
+ * @param {number} [level=2]  Heading level, so pages keep a valid outline.
+ */
+const _level = locals.level || 2;
+%><div class="section-head">
+  <% if (locals.eyebrow) { %><span class="eyebrow"><%= eyebrow %></span><% } %>
+  <h<%= _level %>><%= heading %></h<%= _level %>>
+  <% if (locals.body) { %><p><%= body %></p><% } %>
+</div>

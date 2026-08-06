@@ -1,0 +1,21 @@
+<%
+/**
+ * Labelled form control. Always renders a real <label for> — no placeholder-
+ * as-label, which fails both accessibility and usability once typing starts.
+ *
+ * @param {string} id
+ * @param {string} name
+ * @param {string} label
+ * @param {string} [type='text']
+ * @param {string} [placeholder]
+ * @param {boolean} [textarea=false]
+ */
+const _type = locals.type || 'text';
+%><div class="field">
+  <label class="field__label" for="<%= id %>"><%= label %></label>
+  <% if (locals.textarea) { %>
+    <textarea class="field__input" id="<%= id %>" name="<%= name %>"<% if (locals.placeholder) { %> placeholder="<%= placeholder %>"<% } %>></textarea>
+  <% } else { %>
+    <input class="field__input" id="<%= id %>" name="<%= name %>" type="<%= _type %>"<% if (locals.placeholder) { %> placeholder="<%= placeholder %>"<% } %>>
+  <% } %>
+</div>

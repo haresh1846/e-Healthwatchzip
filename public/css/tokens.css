@@ -1,0 +1,199 @@
+/* ============================================================================
+   HealthZip design tokens
+   ----------------------------------------------------------------------------
+   The single source of truth for colour, space, type, radii and motion.
+   Nothing else in the codebase may declare a literal colour or a magic spacing
+   number — everything references a token defined here.
+
+   Colour principle: the interface is near-monochrome. The ONLY saturated
+   colour on screen belongs to a real clinical classification (the semantic
+   triad below). Colour therefore always carries meaning; it is never
+   decoration. This is what separates the product from a generic template.
+   ========================================================================= */
+
+:root {
+  /* ---- Ground & surfaces -------------------------------------------------
+     Warm off-white rather than pure white: pure #fff reads cold and default.
+     Depth comes from hairline borders, not soft shadows.                    */
+  --ground:          #FAF8F5;
+  --surface:         #FFFFFF;
+  --surface-sunken:  #F3F0EB;
+  --surface-inverse: #101917;
+
+  /* ---- Ink: deep green-black. Chrome, headings, primary actions.
+     Deliberately not the generic healthcare blue.                           */
+  --ink:             #101917;
+  --ink-hover:       #1C2E29;
+
+  /* ---- Neutral ramp, hue-biased toward the ink (never pure grey) -------- */
+  --n-050:           #F3F0EB;
+  --n-100:           #E7E2DA;
+  --n-200:           #D5CFC5;
+  --n-300:           #B3ABA0;
+  --n-400:           #8C857B;
+  --n-500:           #6B655C;
+  --n-600:           #4A4640;
+  --n-700:           #2C2A26;
+
+  /* ---- Text ------------------------------------------------------------- */
+  --text-strong:     var(--ink);
+  --text:            #3A3833;
+  --text-muted:      #5A554D;
+  --text-faint:      #726C61;
+  --text-on-ink:     #F7F5F1;
+
+  /* ---- Lines ------------------------------------------------------------ */
+  --line:            #E7E2DA;
+  --line-strong:     #D5CFC5;
+
+  /* ---- Semantic triad — RESERVED for real clinical classification.
+     Never use these for decoration, category colour-coding, or emphasis.
+     Desaturated + dark so they read clinical rather than alarming, and all
+     three clear WCAG AA on both grounds.                                    */
+  --signal-calm:     #1B6B51;
+  --signal-calm-bg:  #E4F0EA;
+  --signal-watch:    #8A5510;
+  --signal-watch-bg: #F8EEDF;
+  --signal-act:      #B3372E;
+  --signal-act-bg:   #F8E7E5;
+
+  /* ---- Focus ------------------------------------------------------------ */
+  --focus-ring:      #1B6B51;
+
+  /* ---- Spacing scale (rem-based, 4px foundation) ------------------------ */
+  --space-1:  0.25rem;
+  --space-2:  0.5rem;
+  --space-3:  0.75rem;
+  --space-4:  1rem;
+  --space-5:  1.5rem;
+  --space-6:  2rem;
+  --space-7:  3rem;
+  --space-8:  4rem;
+  --space-9:  6rem;
+  --space-10: 8rem;
+
+  /* ---- Section rhythm: fluid so 320px and 4K both breathe correctly ----- */
+  --section-y:       clamp(3.5rem, 7vw, 7rem);
+  --gutter:          clamp(1.25rem, 4vw, 2.5rem);
+  --measure:         68ch;
+
+  /* ---- Type -------------------------------------------------------------
+     Premium comes from scale contrast and tight tracking, not a novelty face.
+     Instrument Serif is reserved for the single largest number on a page.   */
+  --font-ui:         'Schibsted Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-figure:     'Instrument Serif', Georgia, serif;
+
+  --text-xs:         0.75rem;
+  --text-sm:         0.8125rem;
+  --text-base:       0.9375rem;
+  --text-md:         1.0625rem;
+  --text-lg:         clamp(1.125rem, 1.6vw, 1.375rem);
+  --text-xl:         clamp(1.5rem, 2.6vw, 2rem);
+  --text-2xl:        clamp(2rem, 4.2vw, 3rem);
+  --text-3xl:        clamp(2.5rem, 6vw, 4.25rem);
+  --text-figure:     clamp(4rem, 12vw, 8rem);
+
+  --leading-tight:   1.08;
+  --leading-snug:    1.3;
+  --leading-normal:  1.6;
+
+  --tracking-tight:  -0.022em;
+  --tracking-snug:   -0.012em;
+  --tracking-wide:   0.08em;
+
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semi:     600;
+  --weight-bold:     700;
+
+  /* ---- Radii: restrained. Rounded-everything is a template tell. -------- */
+  --radius-sm:       4px;
+  --radius:          8px;
+  --radius-lg:       14px;
+  --radius-pill:     999px;
+
+  /* ---- Elevation: used sparingly; borders do most of the work ----------- */
+  --shadow-sm:       0 1px 2px rgba(16, 25, 23, 0.05);
+  --shadow-md:       0 4px 16px rgba(16, 25, 23, 0.07);
+  --shadow-lg:       0 18px 48px rgba(16, 25, 23, 0.13);
+
+  /* ---- Motion: state changes only, never decorative ---------------------- */
+  --ease:            cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-fast:        120ms;
+  --dur:             200ms;
+  --dur-slow:        320ms;
+
+  /* ---- Layout ----------------------------------------------------------- */
+  --container:       1180px;
+  --container-wide:  1440px;
+  --header-h:        4.5rem;
+}
+
+/* ---- Dark theme -----------------------------------------------------------
+   Authored, not inverted. Contrast and the semantic triad are re-tuned so
+   they stay legible and keep their clinical (not neon) character.           */
+:root[data-theme="dark"] {
+  --ground:          #0C1412;
+  --surface:         #121D1A;
+  --surface-sunken:  #0A110F;
+  --surface-inverse: #F7F5F1;
+
+  --ink:             #F7F5F1;
+  --ink-hover:       #E7E2DA;
+
+  --text-strong:     #F7F5F1;
+  --text:            #D3CFC7;
+  --text-muted:      #A8A299;
+  --text-faint:      #8B867F;
+  --text-on-ink:     #101917;
+
+  --line:            #22302C;
+  --line-strong:     #2E3E39;
+
+  --signal-calm:     #4FC79B;
+  --signal-calm-bg:  #1A332B;
+  --signal-watch:    #E0A44A;
+  --signal-watch-bg: #2D2E20;
+  --signal-act:      #E8756A;
+  --signal-act-bg:   #2E2824;
+
+  --focus-ring:      #4FC79B;
+
+  --shadow-sm:       0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg:       0 18px 48px rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground:          #0C1412;
+    --surface:         #121D1A;
+    --surface-sunken:  #0A110F;
+    --surface-inverse: #F7F5F1;
+
+    --ink:             #F7F5F1;
+    --ink-hover:       #E7E2DA;
+
+    --text-strong:     #F7F5F1;
+    --text:            #D3CFC7;
+    --text-muted:      #A8A299;
+    --text-faint:      #8B867F;
+    --text-on-ink:     #101917;
+
+    --line:            #22302C;
+    --line-strong:     #2E3E39;
+
+    --signal-calm:     #4FC79B;
+    --signal-calm-bg:  #1A332B;
+    --signal-watch:    #E0A44A;
+    --signal-watch-bg: #2D2E20;
+    --signal-act:      #E8756A;
+    --signal-act-bg:   #2E2824;
+
+    --focus-ring:      #4FC79B;
+
+    --shadow-sm:       0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md:       0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-lg:       0 18px 48px rgba(0, 0, 0, 0.5);
+  }
+}

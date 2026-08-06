@@ -1,0 +1,13 @@
+<%
+/**
+ * Renders an ordered array of section descriptors.
+ *
+ * Page order is array order — re-ordering or removing a section is a content
+ * edit in `content/<locale>/pages/*.js`, never a template edit. A descriptor's
+ * `type` maps directly to `views/sections/<type>.ejs`.
+ *
+ * @param {import('../content/schema').Section[]} sections
+ */
+sections.forEach(function (s) { %>
+  <%- include('./sections/' + s.type, { s: s }) %>
+<% }); %>

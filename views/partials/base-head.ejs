@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="<%= t.locale %>">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= locals.pageTitle || t.chrome.brand %></title>
+  <meta name="description" content="<%= locals.pageDesc || '' %>">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="<%= t.chrome.brand %>">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="<%= locals.pageTitle || t.chrome.brand %>">
+  <meta property="og:description" content="<%= locals.pageDesc || '' %>">
+  <meta property="og:image" content="/images/warm-hero.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="<%= locals.pageTitle || t.chrome.brand %>">
+  <meta name="twitter:description" content="<%= locals.pageDesc || '' %>">
+  <link rel="canonical" href="https://e-healthwatch.com<%= locals.canonical || '/' %>">
+
+  <%
+  /* Set the theme before first paint so a dark-mode visitor never sees a
+     flash of the light ground. Kept inline and tiny for that reason. */
+  %>
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('hz-theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/app.css">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "MedicalOrganization",
+    "name": "<%= t.chrome.brand %>",
+    "description": "<%= t.chrome.footer.tagline %>",
+    "url": "https://e-healthwatch.com"
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main"><%= t.chrome.skipToContent %></a>
+
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a class="site-header__brand" href="/"><%= t.chrome.brand %></a>
+
+      <button class="site-header__toggle" type="button"
+              aria-expanded="false" aria-controls="site-nav" data-nav-toggle>
+        <span class="u-visually-hidden">Menu</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/>
+        </svg>
+      </button>
+
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <ul class="site-nav__list">
+          <% t.chrome.nav.forEach(function (link) { %>
+            <li><a class="site-nav__link" href="<%= link.href %>"><%= link.label %></a></li>
+          <% }); %>
+        </ul>
+      </nav>
+
+      <div class="site-header__action">
+        <%- include('../components/button', {
+          label: t.chrome.navAction.label,
+          href: t.chrome.navAction.href,
+          variant: t.chrome.navAction.variant
+        }) %>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">

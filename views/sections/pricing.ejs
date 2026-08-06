@@ -1,0 +1,22 @@
+<%
+/** @param {import('../../content/schema').PricingSection} s */
+%><section class="section">
+  <div class="container pricing__grid">
+    <div>
+      <%- include('../components/section-head', { eyebrow: s.eyebrow, heading: s.heading, body: s.body }) %>
+      <div class="pricing__figure-row">
+        <span class="pricing__price"><%= s.price %></span>
+        <span class="pricing__was"><%= s.priceWas %></span>
+      </div>
+      <p class="pricing__note"><%= s.priceNote %></p>
+      <div class="pricing__action">
+        <%- include('../components/button', { label: s.action.label, href: s.action.href, variant: s.action.variant }) %>
+      </div>
+      <% if (s.footnote) { %><p class="pricing__footnote"><%= s.footnote %></p><% } %>
+    </div>
+
+    <ul class="pricing__includes">
+      <% s.includes.forEach(function (item) { %><li><%= item %></li><% }); %>
+    </ul>
+  </div>
+</section>

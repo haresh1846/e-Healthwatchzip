@@ -1,0 +1,51 @@
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="site-footer__grid">
+        <div>
+          <div class="site-footer__brand"><%= t.chrome.brand %></div>
+          <p class="site-footer__tagline"><%= t.chrome.footer.tagline %></p>
+        </div>
+
+        <% t.chrome.footer.groups.forEach(function (group) { %>
+          <nav aria-label="<%= group.heading %>">
+            <h2 class="site-footer__heading"><%= group.heading %></h2>
+            <ul class="site-footer__links">
+              <% group.links.forEach(function (link) { %>
+                <li><a href="<%= link.href %>"><%= link.label %></a></li>
+              <% }); %>
+            </ul>
+          </nav>
+        <% }); %>
+      </div>
+
+      <p class="site-footer__legal"><%= t.chrome.footer.legal %></p>
+    </div>
+  </footer>
+
+  <script>
+    // Mobile navigation. State toggle only — no decorative motion.
+    (function () {
+      var toggle = document.querySelector('[data-nav-toggle]');
+      var nav = document.getElementById('site-nav');
+      if (!toggle || !nav) return;
+
+      toggle.addEventListener('click', function () {
+        var open = nav.getAttribute('data-open') === 'true';
+        nav.setAttribute('data-open', String(!open));
+        toggle.setAttribute('aria-expanded', String(!open));
+      });
+
+      // Escape closes the panel and returns focus to the control that opened it.
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && nav.getAttribute('data-open') === 'true') {
+          nav.setAttribute('data-open', 'false');
+          toggle.setAttribute('aria-expanded', 'false');
+          toggle.focus();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

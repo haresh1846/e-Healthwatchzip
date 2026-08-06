@@ -1,0 +1,15 @@
+<%
+/** @param {import('../../content/schema').MethodSection} s */
+%><section class="section">
+  <div class="container">
+    <%- include('../components/section-head', { eyebrow: s.eyebrow, heading: s.heading, body: s.body }) %>
+    <ol class="method__steps">
+      <% s.steps.forEach(function (step) { %>
+        <li class="method__step">
+          <h3><%= step.title %></h3>
+          <p><%= step.body %></p>
+        </li>
+      <% }); %>
+    </ol>
+  </div>
+</section>
