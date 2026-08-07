@@ -13,13 +13,13 @@
   <meta property="og:type" content="website">
   <meta property="og:title" content="<%= locals.pageTitle || 'e-healthwatch — Predictive Women\'s Health Analytics' %>">
   <meta property="og:description" content="<%= locals.pageDesc || 'Evidence-based predictive health insights for women using advanced mathematical modelling.' %>">
-  <meta property="og:image" content="/images/warm-hero.jpg">
+  <meta property="og:image" content="<%= (locals.baseUrl || '') %>/images/warm-hero.jpg">
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="<%= locals.pageTitle || 'e-healthwatch' %>">
   <meta name="twitter:description" content="<%= locals.pageDesc || 'Predictive women\'s health analytics — menopause forecasting, BMD calculator and more.' %>">
   <!-- Canonical -->
-  <link rel="canonical" href="https://e-healthwatch.com<%= locals.canonical || '/' %>">
+  <link rel="canonical" href="<%= (locals.baseUrl || '') %><%= locals.canonical || '/' %>">
   <!-- Fonts (non-blocking) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Nunito:wght@400;600;700&display=swap">
   </noscript>
   <!-- Styles -->
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/custom.css">
   <!-- JSON-LD Structured Data -->
   <script type="application/ld+json">

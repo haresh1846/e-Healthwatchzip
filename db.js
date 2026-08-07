@@ -169,6 +169,21 @@ async function init() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    -- Contact enquiries. Previously these existed only as an outbound email,
+    -- so a missing GMAIL_* secret or a failed send lost the message silently
+    -- while the visitor was still told "Message sent!". The row is written
+    -- first; email is best-effort on top of it.
+    CREATE TABLE IF NOT EXISTS contact_messages (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      first_name TEXT,
+      last_name  TEXT,
+      email      TEXT,
+      phone      TEXT,
+      message    TEXT,
+      emailed    INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       sid        TEXT PRIMARY KEY,
       sess       TEXT NOT NULL,
@@ -185,6 +200,7 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_orders_status       ON consumer_orders (status);
     CREATE INDEX IF NOT EXISTS idx_results_order       ON mp_results_v2 (order_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_expires    ON sessions (expires_at);
+    CREATE INDEX IF NOT EXISTS idx_contact_created    ON contact_messages (created_at);
   `);
 
   // Column migrations (safe no-ops when the column already exists)

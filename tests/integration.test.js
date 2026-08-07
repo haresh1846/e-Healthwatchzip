@@ -236,6 +236,71 @@ async function test(name, fn) {
       `expected the order amount and all three guards to use PRICE_PAISE, found ${guardCount} references`);
   });
 
+  await test('4a. Contact messages are stored even when email is not configured', async () => {
+    const { cookie, token } = await freshSession('/contact.asp');
+    const r = await post('/contact.asp', cookie, {
+      _csrf: token, fname: 'Priya', lname: 'Sharma', email: 'priya@example.com',
+      phone: '+91 90000 22222', comment: 'Do you support irregular cycles?',
+    });
+    assert.equal(r.status, 200);
+    const row = db.prepare('SELECT * FROM contact_messages WHERE email = ?').get('priya@example.com');
+    assert.ok(row, 'the enquiry must be stored, not only emailed');
+    assert.equal(row.message, 'Do you support irregular cycles?');
+    assert.equal(row.emailed, 0, 'unsent mail must be flagged so it can be chased');
+  });
+
+  await test('4b. Legal pages required for payments are reachable', async () => {
+    for (const p of ['/terms', '/refund', '/privacy']) {
+      const r = await fetch(BASE + p);
+      assert.equal(r.status, 200, p);
+    }
+    // and linked from the footer, or nobody will find them
+    const home = await (await fetch(BASE + '/')).text();
+    for (const p of ['/terms', '/refund', '/privacy']) {
+      assert.ok(home.includes('href="' + p + '"'), p + ' must be linked in the footer');
+    }
+  });
+
+  await test('4c. Unknown URLs return a branded 404, not the Express default', async () => {
+    const r = await fetch(BASE + '/definitely-not-a-page');
+    assert.equal(r.status, 404);
+    const html = await r.text();
+    assert.ok(html.includes("We couldn't find that page"), 'expected the styled 404');
+    assert.ok(!/Cannot GET/.test(html), 'must not leak the Express default page');
+  });
+
+  await test('4d. Security headers are present and Express is not advertised', async () => {
+    const r = await fetch(BASE + '/');
+    assert.equal(r.headers.get('x-powered-by'), null, 'X-Powered-By must be disabled');
+    assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+    assert.equal(r.headers.get('x-frame-options'), 'DENY');
+    assert.ok(r.headers.get('referrer-policy'));
+    const csp = r.headers.get('content-security-policy');
+    assert.ok(csp, 'a CSP must be set');
+    // Razorpay must stay allowed or checkout breaks.
+    assert.ok(csp.includes('https://checkout.razorpay.com'), 'CSP must allow the Razorpay checkout script');
+    assert.ok(csp.includes("frame-ancestors 'none'"));
+  });
+
+  await test('4e. robots.txt and sitemap.xml are served and keep private areas out', async () => {
+    const robots = await (await fetch(BASE + '/robots.txt')).text();
+    assert.ok(robots.includes('Disallow: /admin'));
+    assert.ok(robots.includes('Sitemap:'));
+    const sitemap = await (await fetch(BASE + '/sitemap.xml')).text();
+    assert.ok(sitemap.includes('<urlset'));
+    assert.ok(sitemap.includes('/forecasting.asp'));
+    assert.ok(!sitemap.includes('/admin'), 'admin must not be advertised in the sitemap');
+  });
+
+  await test('4f. No fabricated contact details are published', async () => {
+    const home = await (await fetch(BASE + '/')).text();
+    const contact = await (await fetch(BASE + '/contact.asp')).text();
+    for (const page of [home, contact]) {
+      assert.ok(!page.includes('+44 (0) 123 456 789'), 'placeholder phone must not ship');
+      assert.ok(!page.includes('Medical Research Park'), 'placeholder address must not ship');
+    }
+  });
+
   await test('3e. BMD waitlist records a signup', async () => {
     const { cookie, token } = await freshSession('/bmd.asp');
     const r = await post('/bmd-waitlist', cookie, {
@@ -273,8 +338,17 @@ async function test(name, fn) {
     assert.equal(r.status, 200);
     assert.ok((await r.text()).includes('sent a password reset link'));
     const m = serverLog.match(/reset link for \S+ is: (\S+)/);
-    assert.ok(m, 'reset link must be logged when email is not configured');
+    assert.ok(m, 'reset link must be logged in non-production when email is not configured');
     resetLink = m[1].replace(/^https?:\/\/[^/]+/, BASE);
+  });
+
+  await test('5a2. The reset link is never written to logs in production', async () => {
+    // Logs are retained and readable, so a logged reset link is an account
+    // takeover path. Guarded by NODE_ENV, which Vercel sets to 'production'.
+    const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    const guard = src.match(/if \(process\.env\.NODE_ENV === 'production'\)[\s\S]{0,400}?reset link for/);
+    assert.ok(guard, 'the reset-link log must sit behind a NODE_ENV production guard');
+    assert.ok(/link withheld from logs/.test(src), 'production branch must log without the link');
   });
 
   await test('5b. Expired reset token is rejected', async () => {

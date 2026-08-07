@@ -1,0 +1,96 @@
+<%- include('partials/header', {
+  pageTitle: 'Messages',
+  activeTab: 'messages',
+  userCount: locals.userCount || 0,
+  orderCount: locals.orderCount || 0,
+  resultCount: locals.resultCount || 0,
+  bmdCount: locals.bmdCount || 0,
+  leadCount: locals.leadCount || 0,
+  waitCount: locals.waitCount || 0,
+  msgCount: rows.length
+}) %>
+
+<div class="adm-body">
+
+  <div class="adm-stats">
+    <div class="adm-stat">
+      <div class="adm-stat-label">Total Enquiries</div>
+      <div class="adm-stat-value"><%= rows.length %></div>
+    </div>
+    <div class="adm-stat">
+      <div class="adm-stat-label">Not Emailed</div>
+      <div class="adm-stat-value"><%= rows.filter(function(r){ return !r.emailed; }).length %></div>
+    </div>
+  </div>
+
+  <div class="adm-section-header">
+    <h1 class="adm-section-title">Contact Messages</h1>
+    <div class="adm-section-spacer"></div>
+    <div class="adm-search">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search-input" placeholder="Search name, email or message…" oninput="filterTable()" autocomplete="off">
+    </div>
+    <a href="/admin/messages?export=csv" class="adm-export">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export CSV
+    </a>
+  </div>
+
+  <p class="adm-note">
+    Every enquiry is stored here first, then emailed. Anything marked
+    <strong>Not emailed</strong> reached the site but the mail send failed or
+    was not configured — it still needs a reply.
+  </p>
+
+  <div class="adm-table-wrap">
+    <table class="adm-table" id="data-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>From</th>
+          <th>Phone</th>
+          <th>Message</th>
+          <th class="hide-mobile">Received</th>
+          <th>Emailed</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!rows.length) { %>
+        <tr><td colspan="6" style="text-align:center;color:var(--stone);padding:28px 0;">No enquiries yet.</td></tr>
+        <% } %>
+        <% rows.forEach(function(r) { %>
+        <tr>
+          <td class="mono"><%= r.id %></td>
+          <td>
+            <strong><%= [r.first_name, r.last_name].filter(Boolean).join(' ') || '—' %></strong>
+            <% if (r.email) { %><br><a href="mailto:<%= r.email %>" style="font-size:12px;"><%= r.email %></a><% } %>
+          </td>
+          <td class="mono"><%= r.phone || '—' %></td>
+          <td style="max-width:380px;white-space:pre-wrap;"><%= r.message || '—' %></td>
+          <td class="mono hide-mobile"><%= r.created_at ? r.created_at.slice(0,16).replace('T',' ') : '—' %></td>
+          <td>
+            <% if (r.emailed) { %>
+              <span class="badge badge-grey">Sent</span>
+            <% } else { %>
+              <span class="badge" style="background:#FEF3C7;color:#92400E;">Not emailed</span>
+            <% } %>
+          </td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+function filterTable() {
+  var q = document.getElementById('search-input').value.toLowerCase();
+  var rows = document.querySelectorAll('#data-table tbody tr');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].style.display = rows[i].textContent.toLowerCase().indexOf(q) > -1 ? '' : 'none';
+  }
+}
+</script>
+
+<%- include('partials/footer') %>

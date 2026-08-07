@@ -1,0 +1,59 @@
+<%- include('partials/header', { pageTitle: 'Refund & Cancellation Policy — e-healthwatch', pageDesc: 'When e-healthwatch refunds a payment, how to request one, and how long it takes.' }) %>
+
+<section id="banner-section">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="banner-placeholder text-center">
+        <h2>Refund &amp; Cancellation Policy</h2>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="about-cont">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+        <div class="aboutpage-content" style="max-width:760px;margin:0 auto;">
+
+          <p style="color:var(--stone);font-size:13px;">Last updated: August 2026</p>
+
+          <h2 class="aboutpage-title">What you are buying</h2>
+          <p>The Menopause Forecast is a <strong>digital product delivered immediately</strong>. You pay &#8377;<%= priceRupees %> per test, once. The moment payment succeeds, your forecast is generated and your report becomes available in your account.</p>
+
+          <h2 class="aboutpage-title">When we refund</h2>
+          <p>We refund in full, no questions asked, in these situations:</p>
+          <ul style="line-height:1.9;">
+            <li><strong>You were charged but no result was produced</strong> — a failed or interrupted payment that still left your account debited.</li>
+            <li><strong>You were charged more than once</strong> for the same test. We refund the duplicates.</li>
+            <li><strong>The result could not be generated</strong> because of a fault on our side.</li>
+          </ul>
+
+          <h2 class="aboutpage-title">When we do not refund</h2>
+          <p>Because the forecast is generated and delivered the instant you pay, we cannot refund a test that has already produced a result. Specifically, we do not refund because:</p>
+          <ul style="line-height:1.9;">
+            <li>You did not like or did not agree with the forecast. It is a statistical estimate, not a promise about your future, and this is stated before you pay.</li>
+            <li>You entered an incorrect AMH value, age or cycle answer. Please check your inputs on the confirmation step — we show them back to you before taking payment for exactly this reason.</li>
+            <li>You changed your mind after seeing the result.</li>
+          </ul>
+          <p>If the forecast could not be calculated meaningfully from your inputs, we tell you that <em>before</em> charging you, and no payment is taken.</p>
+
+          <h2 class="aboutpage-title">Cancellation</h2>
+          <p>There is nothing to cancel: this is a one-time payment per test, not a subscription. We do not store your payment details and cannot bill you again. You may delete your account at any time by contacting us.</p>
+
+          <h2 class="aboutpage-title">How to request a refund</h2>
+          <p>Write to us through the <a href="/contact.asp">contact page</a><% if (business.email) { %> or at <a href="mailto:<%= business.email %>"><%= business.email %></a><% } %> within <strong>7 days</strong> of the payment, including the date of payment and the email address on your account. You do not need the payment reference — we can find it.</p>
+
+          <h2 class="aboutpage-title">How long it takes</h2>
+          <p>We respond to refund requests within <strong>2 business days</strong>. Approved refunds are submitted to our payment provider within <strong>3 business days</strong>, and the money reaches the original payment method within <strong>5&ndash;7 business days</strong> of that, depending on your bank. Refunds always return to the method you paid with; we cannot redirect them elsewhere.</p>
+
+          <h2 class="aboutpage-title">If you are unhappy with the outcome</h2>
+          <p>Contact us first — most issues are a misunderstanding we can resolve quickly. If you remain dissatisfied, you may raise the matter with your card issuer or bank, or with Razorpay, our payment provider.</p>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>
