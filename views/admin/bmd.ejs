@@ -1,5 +1,5 @@
 <%- include('partials/header', {
-  pageTitle: 'BMD Results',
+  pageTitle: 'BMD History',
   activeTab: 'bmd',
   userCount: locals.userCount || 0,
   orderCount: locals.orderCount || 0,
@@ -25,7 +25,7 @@
   </div>
 
   <div class="adm-section-header">
-    <h1 class="adm-section-title">BMD Results</h1>
+    <h1 class="adm-section-title">BMD History</h1>
     <div class="adm-section-spacer"></div>
     <div class="adm-search">
       <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -36,6 +36,12 @@
       Export CSV
     </a>
   </div>
+
+  <p class="adm-note">
+    The BMD calculator is retired while its model is recalibrated, so no new rows
+    arrive here. These records are kept as-is and their report links still work.
+    People waiting for the relaunch are on the BMD Waitlist tab.
+  </p>
 
   <div class="adm-table-wrap">
     <table class="adm-table" id="data-table">
