@@ -249,6 +249,52 @@ async function test(name, fn) {
     assert.equal(row.emailed, 0, 'unsent mail must be flagged so it can be chased');
   });
 
+  await test('4a2. Analytics stays off, and off the admin panel, unless configured', async () => {
+    // The suite runs without CLARITY_PROJECT_ID, so nothing should load and the
+    // privacy policy must not describe tracking that isn't happening.
+    const home = await (await fetch(BASE + '/')).text();
+    assert.ok(!home.includes('clarity.ms/tag'), 'no analytics script without a project ID');
+    const privacy = await (await fetch(BASE + '/privacy')).text();
+    assert.ok(!privacy.includes('Microsoft Clarity'), 'privacy policy must not claim analytics that are disabled');
+
+    // Admin uses its own header, so a recording can never contain customer data.
+    const adminHeader = fs.readFileSync(path.join(__dirname, '..', 'views/admin/partials/header.ejs'), 'utf8');
+    assert.ok(!/clarity/i.test(adminHeader), 'the admin panel must never load session recording');
+
+    // Health results are masked in the templates, not left to dashboard config.
+    for (const v of ['my-result.ejs', 'forecast-report.ejs', 'bmd-report.ejs', 'forecast-gated.ejs']) {
+      const src = fs.readFileSync(path.join(__dirname, '..', 'views', v), 'utf8');
+      assert.ok(src.includes('data-clarity-mask'), v + ' must mask health data from recordings');
+    }
+
+    // And the CSP must actually permit Clarity, or it fails silently once enabled.
+    const csp = (await fetch(BASE + '/')).headers.get('content-security-policy');
+    assert.ok(csp.includes('https://*.clarity.ms'), 'CSP must allow Clarity or it will be blocked');
+  });
+
+  await test('4a3. Every public page has a unique title, description and canonical', async () => {
+    // The canonical tag previously defaulted to '/' on every page, which tells
+    // search engines the whole site duplicates the homepage.
+    const paths = ['/', '/forecasting.asp', '/bmd.asp', '/gynaecology.asp', '/pregnancy.asp',
+                   '/menopause.asp', '/health.asp', '/organ.asp', '/data.asp', '/contact.asp',
+                   '/privacy', '/terms', '/refund'];
+    const titles = new Set(), descs = new Set(), canons = new Set();
+    for (const p of paths) {
+      const html = await (await fetch(BASE + p)).text();
+      const title = (html.match(/<title>([^<]*)<\/title>/) || [])[1] || '';
+      const desc  = (html.match(/<meta name="description" content="([^"]*)"/) || [])[1] || '';
+      const canon = (html.match(/<link rel="canonical" href="([^"]*)"/) || [])[1] || '';
+      assert.ok(title, p + ' must have a title');
+      assert.ok(desc,  p + ' must have a meta description');
+      assert.ok(canon.endsWith(p === '/' ? '/' : p), p + ' canonical must point at itself, got ' + canon);
+      assert.ok((html.match(/<h1[\s>]/g) || []).length === 1, p + ' must have exactly one H1');
+      titles.add(title); descs.add(desc); canons.add(canon);
+    }
+    assert.equal(titles.length || titles.size, paths.length, 'every page needs a distinct title');
+    assert.equal(descs.size,  paths.length, 'every page needs a distinct meta description');
+    assert.equal(canons.size, paths.length, 'every page needs its own canonical URL');
+  });
+
   await test('4b. Legal pages required for payments are reachable', async () => {
     for (const p of ['/terms', '/refund', '/privacy']) {
       const r = await fetch(BASE + p);

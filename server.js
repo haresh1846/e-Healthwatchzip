@@ -53,6 +53,11 @@ function getRazorpay() {
 // environment and deliberately have NO placeholder fallback: an unset value
 // renders nothing at all, so the site can never ship a fake phone number or
 // address the way it previously did.
+// Microsoft Clarity session analytics. Loads only when a project ID is set,
+// and only on the public site — the admin templates use their own header, so
+// customer records are never inside a recording.
+const CLARITY_PROJECT_ID = process.env.CLARITY_PROJECT_ID || '';
+
 const BUSINESS = {
   name:    process.env.BUSINESS_NAME    || 'e-healthwatch',
   email:   process.env.BUSINESS_EMAIL   || '',
@@ -95,9 +100,9 @@ app.use((req, res, next) => {
     "img-src 'self' data: https:",
     "font-src 'self' https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
+    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com https://*.clarity.ms https://c.bing.com",
     "frame-src https://api.razorpay.com https://checkout.razorpay.com",
-    "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com",
+    "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com https://*.clarity.ms https://c.bing.com",
   ].join('; '));
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -246,6 +251,11 @@ app.use((req, res, next) => {
   res.locals.listPriceRupees = LIST_PRICE_RUPEES;
   res.locals.discountPct     = DISCOUNT_PCT;
   res.locals.business        = BUSINESS;
+  res.locals.clarityId       = CLARITY_PROJECT_ID;
+  // Canonical defaulted to '/' on every page, which told search engines the
+  // whole site was one duplicate of the homepage. Derive it from the request
+  // so it is always right, rather than relying on each route to remember.
+  res.locals.canonical       = req.path === '/' ? '/' : req.path.replace(/\/+$/, '');
   // Absolute base for canonical + og:image; falls back to the live host.
   res.locals.baseUrl         = (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
   next();

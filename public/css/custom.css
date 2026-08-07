@@ -1224,7 +1224,9 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   border-bottom:1px solid var(--rose-100);
 }
 #banner-section .container-fluid { text-align:center; }
-#banner-section h2, .banner-placeholder h2 { font-family:var(--font-serif);font-size:28px;color:var(--rose);margin:0;text-align:center; }
+/* The banner heading is the page's H1 for SEO; H2 kept for any page still using it. */
+#banner-section h1, #banner-section h2,
+.banner-placeholder h1, .banner-placeholder h2 { font-family:var(--font-serif);font-size:28px;color:var(--rose);margin:0;text-align:center; }
 .banner-placeholder { width:100%;color:var(--stone-dark);padding:8px 0;text-align:center; }
 .banner-placeholder p { margin-top:8px;color:var(--stone);font-size:15px; }
 #about-cont { padding:60px 0;background:var(--cream); }
@@ -1404,7 +1406,7 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   /* Inner banner */
   #banner-section     { padding:40px 16px; }
   #banner-section h2,
-  .banner-placeholder h2 { font-size:26px; }
+  .banner-placeholder h1, .banner-placeholder h2 { font-size:26px; }
 
   /* Inner content */
   #about-cont         { padding:40px 0; }
