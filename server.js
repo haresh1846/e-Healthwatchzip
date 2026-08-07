@@ -374,77 +374,36 @@ app.get('/bmd-patient/:name', async (req, res) => {
   res.redirect('/bmd.asp');
 });
 
-// BMD Calculator – GET
+// BMD Calculator – retired, now a coming-soon page with a notify-me list.
+// The calculator itself is withdrawn while the model is recalibrated: for
+// realistic inputs computeBmdResult returns "Normal" almost every time, so the
+// three-way WHO classification the page promised was not being exercised.
+// Historical records and the /bmd-report links already handed out still work.
 app.get('/bmd.asp', async (req, res) => {
-  req.session.guid = crypto.randomUUID();
-  res.render('bmd', { bmdError: req.query.error || null });
+  res.render('bmd', { waitlistError: null, waitlistDone: false });
 });
 
-// BMD Save – POST
-app.post('/bmdsave.asp', async (req, res) => {
-  if (!req.session.guid) return res.redirect('/bmd.asp');
+// BMD waitlist – POST. Anonymous, like the calculator was.
+app.post('/bmd-waitlist', async (req, res) => {
+  const render = (waitlistError, waitlistDone) => res.render('bmd', { waitlistError, waitlistDone });
 
-  if (rateLimited('bmdcalc:' + req.ip)) {
-    return res.redirect('/bmd.asp?error=' + encodeURIComponent(RATE_LIMIT_MESSAGE));
+  if (rateLimited('bmdwait:' + req.ip)) return render(RATE_LIMIT_MESSAGE, false);
+
+  const email = (req.body.email || '').trim();
+  const phone = (req.body.phone || '').trim() || null;
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return render('Please enter a valid email address.', false);
   }
 
-  const { Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, Txt_email } = req.body;
-  const guid = req.session.guid;
-
-  // Server-side validation: all numeric fields must be positive numbers
-  const ageV    = parseFloat(Txt_age);
-  const heightV = parseFloat(Txt_height);
-  const weightV = parseFloat(Txt_weight);
-  const halV    = parseFloat(Txt_hal);
-  const nsaV    = parseFloat(Txt_nsa);
-
-  const bmdInputError =
-    !Txt_name || Txt_name.trim() === ''              ? 'Name is required.' :
-    isNaN(ageV)    || ageV    <= 0                   ? 'Age must be a positive number.' :
-    isNaN(heightV) || heightV <= 0                   ? 'Height must be a positive number.' :
-    isNaN(weightV) || weightV <= 0                   ? 'Weight must be a positive number.' :
-    isNaN(halV)    || halV    <= 0                   ? 'HAL must be a positive number.' :
-    isNaN(nsaV)    || nsaV    <= 0                   ? 'NSA must be a positive number.' :
-    null;
-
-  if (bmdInputError) {
-    return res.redirect('/bmd.asp?error=' + encodeURIComponent(bmdInputError));
-  }
-
-  const { classification } = computeBmdResult({ height: Txt_height, weight: Txt_weight, age: Txt_age, hal: Txt_hal, nsa: Txt_nsa });
-  const email = (Txt_email || '').trim() || null;
-
-  await db.prepare(
-    "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid, source, email, classification) VALUES (?, ?, ?, ?, ?, ?, ?, 'public', ?, ?)"
-  ).run(Txt_name, Txt_age, Txt_height, Txt_weight, Txt_hal, Txt_nsa, guid, email, classification);
-
-  return res.redirect('/result.asp');
+  await db.prepare('INSERT INTO bmd_waitlist (email, phone) VALUES (?, ?)').run(email, phone);
+  return render(null, true);
 });
 
-// BMD Result
-app.get('/result.asp', async (req, res) => {
-  if (!req.session.guid) return res.redirect('/bmd.asp');
-
-  const guid = req.session.guid;
-  const row = await db.prepare("SELECT * FROM bmd WHERE guid = ?").get(guid);
-
-  if (!row) return res.redirect('/bmd.asp');
-
-  const { score, classification, classColor, classNote } = computeBmdResult(row);
-
-  // Records are kept permanently for the visitor to revisit via /bmd-report,
-  // but clear the guid from the session so Back → /bmd.asp gets a fresh form.
-  req.session.guid = null;
-
-  res.render('result', {
-    result: score.toFixed(4),
-    name: row.name,
-    guid: row.guid,
-    classification,
-    classColor,
-    classNote,
-  });
-});
+// Retired: the calculator's save and result endpoints. Kept as redirects so
+// bookmarks and any in-flight form posts land somewhere sensible.
+app.post('/bmdsave.asp', async (req, res) => res.redirect('/bmd.asp'));
+app.get('/result.asp', async (req, res) => res.redirect('/bmd.asp'));
 
 // BMD Report – printable page for a specific test. Identified by guid (an
 // unguessable crypto.randomUUID) rather than the row's sequential id, since
@@ -1235,6 +1194,7 @@ async function getTabCounts() {
     resultCount: (await db.prepare('SELECT COUNT(*) as c FROM mp_results_v2').get() || {}).c || 0,
     bmdCount:    (await db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
     leadCount:   (await db.prepare('SELECT COUNT(*) as c FROM forecast_gate_leads').get() || {}).c || 0,
+    waitCount:   (await db.prepare('SELECT COUNT(*) as c FROM bmd_waitlist').get() || {}).c || 0,
   };
 }
 
@@ -1439,6 +1399,33 @@ app.get('/admin/forecast-leads', requireAdmin, async (req, res) => {
   });
 
   res.render('admin/forecast-leads', { leads: leadsWithWa, ...await getTabCounts() });
+});
+
+// GET /admin/bmd-waitlist — people to notify when the BMD calculator returns.
+app.get('/admin/bmd-waitlist', requireAdmin, async (req, res) => {
+  const rows = await db.prepare(
+    'SELECT id, email, phone, created_at FROM bmd_waitlist ORDER BY id DESC'
+  ).all();
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'bmd-waitlist.csv', [
+      { key: 'id',         label: 'ID' },
+      { key: 'email',      label: 'Email' },
+      { key: 'phone',      label: 'Phone' },
+      { key: 'created_at', label: 'Signed up' },
+    ], rows);
+  }
+
+  // Same free wa.me click-to-chat approach as the forecast leads: no API or
+  // paid account, but a human still has to press send in WhatsApp.
+  const withWa = rows.map(r => {
+    const digits = r.phone ? String(r.phone).replace(/\D/g, '') : '';
+    if (!digits) return { ...r, waLink: null };
+    const message = `Hi, this is e-healthwatch. You asked to be told when our BMD Calculator goes live — it's ready now. You can try it free, no account needed.`;
+    return { ...r, waLink: `https://wa.me/${digits}?text=${encodeURIComponent(message)}` };
+  });
+
+  res.render('admin/bmd-waitlist', { rows: withWa, ...await getTabCounts() });
 });
 
 // Note: the admin panel is view/analytics-only now that BMD is free/public —

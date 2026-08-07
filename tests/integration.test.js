@@ -67,6 +67,14 @@ async function post(pagePath, cookie, body) {
   });
 }
 
+// Log in to the admin panel and return the authenticated cookie.
+async function adminSession() {
+  const { cookie, token } = await freshSession('/admin/login');
+  const login = await post('/admin/login', cookie, { _csrf: token, password: ADMIN_TEST_PASSWORD });
+  const setCookie = login.headers.get('set-cookie');
+  return setCookie ? setCookie.split(';')[0] : cookie;
+}
+
 // Pre-seed a plain-text bmdlogin row before the server ever starts, so
 // db.js's startup migration (which runs unconditionally, not in response to
 // a login attempt) has something real to hash.
@@ -83,9 +91,23 @@ function seedPlaintextClinicRow() {
     )
   `);
   db.prepare("INSERT INTO bmdlogin (username, pwd, expirydate) VALUES ('legacy-clinic', 'plaintext99', '2099-12-31')").run();
+
+  // A record from when the calculator was live. The calculator is retired, but
+  // report links already handed out must keep working, so seed one to prove it.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bmd (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT, age TEXT, height TEXT, weight TEXT, hal TEXT, nsa TEXT,
+      guid TEXT UNIQUE
+    )
+  `);
+  db.prepare(
+    "INSERT INTO bmd (name, age, height, weight, hal, nsa, guid) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run('Legacy BMD Record', '45', '160', '60', '100', '130', LEGACY_BMD_GUID);
   db.close();
 }
 
+const LEGACY_BMD_GUID = '11111111-2222-3333-4444-555555555555';
 const ADMIN_TEST_PASSWORD = 'integration-test-admin-pass';
 
 async function startServer() {
@@ -151,43 +173,28 @@ async function test(name, fn) {
   await test('2. Retired /mpresult.asp route no longer exists', async () => {
     const g = await fetch(BASE + '/mpresult.asp', { redirect: 'manual' });
     assert.equal(g.status, 404);
-    const { cookie, token } = await freshSession('/bmd.asp');
+    const { cookie, token } = await freshSession('/signup');
     const p = await post('/mpresult.asp', cookie, {
       _csrf: token, Txt_name: 'X', Txt_age: '34', cmbperiods: 'R', Txt_amh: '2.0',
     });
     assert.equal(p.status, 404);
   });
 
-  await test('3a. Public BMD calculator computes the published formula/classification with no login', async () => {
+  await test('3a. Retired BMD calculator: /bmdsave.asp no longer records a result', async () => {
+    const before = db.prepare('SELECT COUNT(*) AS c FROM bmd').get().c;
     const { cookie, token } = await freshSession('/bmd.asp');
-    const height = 160, weight = 60, age = 45, hal = 100, nsa = 130;
-    const expectedScore = (
-      1.06861 *
-      Math.pow(height * 0.01, 0.326842) *
-      Math.pow(weight, 0.211909) *
-      Math.pow(hal, 0.0608258) *
-      Math.pow(age, -0.332916) *
-      Math.pow(nsa * 0.0174533, -0.239446)
-    ).toFixed(4);
-    const expectedClass = parseFloat(expectedScore) >= 0.738 ? 'Normal' : parseFloat(expectedScore) >= 0.558 ? 'Osteopenia' : 'Osteoporosis';
-
     const save = await post('/bmdsave.asp', cookie, {
-      _csrf: token, Txt_name: 'BMD Formula Test', Txt_age: String(age), Txt_height: String(height),
-      Txt_weight: String(weight), Txt_hal: String(hal), Txt_nsa: String(nsa),
+      _csrf: token, Txt_name: 'Should Not Save', Txt_age: '45', Txt_height: '160',
+      Txt_weight: '60', Txt_hal: '100', Txt_nsa: '130',
     });
     assert.equal(save.status, 302);
-    assert.equal(save.headers.get('location'), '/result.asp');
+    assert.equal(save.headers.get('location'), '/bmd.asp');
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM bmd').get().c, before, 'no new bmd row may be written');
 
-    const result = await fetch(BASE + '/result.asp', { headers: { cookie } });
-    const html = await result.text();
-    assert.ok(html.includes(expectedScore), `expected BMD score ${expectedScore} in result page`);
-    assert.ok(html.includes(expectedClass), `expected classification ${expectedClass} in result page`);
-
-    const guidMatch = html.match(/bmd-report\/([a-f0-9-]+)/);
-    assert.ok(guidMatch, 'result page must link to /bmd-report/:guid');
-    const report = await fetch(BASE + '/bmd-report/' + guidMatch[1]);
-    assert.equal(report.status, 200);
-    assert.ok((await report.text()).includes('BMD Formula Test'));
+    // /result.asp is retired too — it must not render a score for anyone.
+    const r = await fetch(BASE + '/result.asp', { headers: { cookie }, redirect: 'manual' });
+    assert.equal(r.status, 302);
+    assert.equal(r.headers.get('location'), '/bmd.asp');
   });
 
   await test('3b. BMD report is not reachable by a guessed/bogus guid', async () => {
@@ -204,16 +211,39 @@ async function test(name, fn) {
     }
   });
 
-  await test('3d. BMD calculator rate limiter trips after the cap', async () => {
-    let lastLocation;
-    for (let i = 0; i < 11; i++) {
-      const { cookie, token } = await freshSession('/bmd.asp'); // fresh guid each time — bmd.guid is UNIQUE
-      const r = await post('/bmdsave.asp', cookie, {
-        _csrf: token, Txt_name: 'Rate Test', Txt_age: '40', Txt_height: '160', Txt_weight: '60', Txt_hal: '100', Txt_nsa: '130',
-      });
-      lastLocation = r.headers.get('location');
-    }
-    assert.ok(lastLocation.startsWith('/bmd.asp?error='), `11th attempt should be rate-limited, got redirect to ${lastLocation}`);
+  await test('3d. Reports issued before the retirement still open', async () => {
+    const r = await fetch(BASE + '/bmd-report/' + LEGACY_BMD_GUID);
+    assert.equal(r.status, 200);
+    assert.ok((await r.text()).includes('Legacy BMD Record'));
+  });
+
+  await test('3e. BMD waitlist records a signup', async () => {
+    const { cookie, token } = await freshSession('/bmd.asp');
+    const r = await post('/bmd-waitlist', cookie, {
+      _csrf: token, email: 'waitlist@example.com', phone: '+91 90000 11111',
+    });
+    assert.equal(r.status, 200);
+    assert.ok((await r.text()).includes("You're on the list"));
+
+    const row = db.prepare('SELECT * FROM bmd_waitlist WHERE email = ?').get('waitlist@example.com');
+    assert.ok(row, 'waitlist row must be written');
+    assert.equal(row.phone, '+91 90000 11111');
+  });
+
+  await test('3f. BMD waitlist rejects a malformed email and stores nothing', async () => {
+    const before = db.prepare('SELECT COUNT(*) AS c FROM bmd_waitlist').get().c;
+    const { cookie, token } = await freshSession('/bmd.asp');
+    const r = await post('/bmd-waitlist', cookie, { _csrf: token, email: 'not-an-email' });
+    assert.equal(r.status, 200);
+    assert.ok((await r.text()).includes('valid email address'));
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM bmd_waitlist').get().c, before);
+  });
+
+  await test('3g. Admin waitlist page lists the signup with a wa.me follow-up link', async () => {
+    const cookie = await adminSession();
+    const html = await (await fetch(BASE + '/admin/bmd-waitlist', { headers: { cookie } })).text();
+    assert.ok(html.includes('waitlist@example.com'), 'waitlist email must appear');
+    assert.ok(html.includes('https://wa.me/919000011111?text='), 'wa.me link must be built from the phone digits');
   });
 
   let resetLink;
@@ -457,7 +487,7 @@ async function test(name, fn) {
   });
 
   await test('7e. Precheck rejects unauthenticated requests (same as /forecast/:profileId)', async () => {
-    const { cookie, token } = await freshSession('/bmd.asp'); // valid CSRF, no consumer login
+    const { cookie, token } = await freshSession('/signup'); // valid CSRF, no consumer login
     const r = await post(`/forecast/${precheckProfileId}/precheck`, cookie, {
       _csrf: token, Txt_age: '30', cmbperiods: 'R', Txt_amh: '3.0',
     });

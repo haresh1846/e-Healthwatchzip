@@ -1707,3 +1707,62 @@ textarea.ehw-contact__input { height:120px;resize:none; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   COMING SOON — BMD calculator
+   The calculator is withdrawn while its model is recalibrated. Its
+   links stay in place and lead to a notify-me page, so the traffic
+   they already carry turns into a waitlist rather than a dead end.
+   ══════════════════════════════════════════════════════════════════ */
+.ehw-soon-tag {
+  display:inline-flex;align-items:center;vertical-align:middle;
+  margin-left:6px;padding:2px 8px;border-radius:9999px;
+  background:var(--amber-100);color:#B45309;
+  font-family:var(--font-sans);font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;
+}
+.ehw-soon-tag--lg { font-size:12px;padding:4px 12px;margin-left:10px; }
+
+.soon__inner { display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start; }
+/* Grid items default to min-width:auto, which would let the chart's minimum
+   width push the whole page sideways instead of scrolling inside its own box. */
+.soon__intro, .soon__aside { min-width:0; }
+.soon__badge {
+  display:inline-flex;align-items:center;gap:7px;margin-bottom:16px;
+  padding:8px 16px;border-radius:9999px;background:var(--amber-100);
+  color:#B45309;font-size:12px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.1em;
+}
+.soon h1 { font-size:clamp(30px,4.5vw,44px);color:var(--stone-dark);margin-bottom:16px;line-height:1.15; }
+.soon__lead { font-size:17px;color:var(--stone);line-height:1.75;margin-bottom:28px;max-width:52ch; }
+.soon__list { list-style:none;margin:0 0 32px;padding:0; }
+.soon__list li { display:flex;align-items:center;gap:12px;color:var(--stone-dark);margin-bottom:14px;font-size:15px; }
+.soon__list-dot { width:24px;height:24px;background:var(--rose-200);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#9f1239; }
+
+.soon__notify { background:white;border:1px solid var(--rose-100);border-radius:2rem;padding:32px; }
+.soon__notify h2 { font-size:21px;color:var(--stone-dark);margin-bottom:6px; }
+.soon__notify-sub { font-size:14px;color:var(--stone);margin-bottom:20px; }
+.soon__form { display:flex;flex-direction:column;gap:16px; }
+.soon__field { display:flex;flex-direction:column;gap:6px; }
+.soon__field label { font-size:13px;font-weight:700;color:var(--stone-dark); }
+.soon__optional { font-weight:400;color:var(--stone); }
+.soon__hint { font-size:12px;color:var(--stone); }
+.soon__submit { width:100%;justify-content:center; }
+.soon__error {
+  background:var(--rose-50);border:1px solid var(--rose-200);color:#9f1239;
+  border-radius:12px;padding:11px 14px;font-size:14px;font-weight:600;margin-bottom:16px;
+}
+.soon__done { display:flex;align-items:flex-start;gap:12px;color:#15803D; }
+.soon__done strong { display:block;font-size:16px;color:var(--stone-dark);margin-bottom:3px; }
+.soon__done span   { font-size:14px;color:var(--stone);line-height:1.6; }
+.soon__done svg    { flex-shrink:0;margin-top:2px; }
+.soon__meanwhile { margin-top:24px;font-size:14px;color:var(--stone);line-height:1.7; }
+.soon__meanwhile a { color:var(--rose-dark);font-weight:700; }
+.soon__aside-note { margin-top:14px;font-size:13px;color:var(--stone);line-height:1.6; }
+
+@media (max-width: 900px) {
+  .soon__inner { grid-template-columns:1fr;gap:36px; }
+}
+@media (max-width: 480px) {
+  .soon__notify { padding:22px 18px;border-radius:1.5rem; }
+}

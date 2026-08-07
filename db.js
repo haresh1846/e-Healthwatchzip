@@ -159,6 +159,16 @@ async function init() {
       FOREIGN KEY (profile_id) REFERENCES consumer_profiles(id)
     );
 
+    -- Notify-me list for the retired BMD calculator. Anonymous, like the
+    -- calculator itself was — requiring an account here would lose most of
+    -- the interest the existing BMD links still bring in.
+    CREATE TABLE IF NOT EXISTS bmd_waitlist (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      email      TEXT NOT NULL,
+      phone      TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS sessions (
       sid        TEXT PRIMARY KEY,
       sess       TEXT NOT NULL,
