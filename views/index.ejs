@@ -224,26 +224,6 @@
   </div>
 </section>
 
-<script>
-// Reveal the three steps as the section scrolls into view. The hidden starting
-// state lives behind .ehw-steps--animate, which only this script adds — so with
-// JavaScript off the section renders normally instead of staying invisible.
-(function () {
-  var steps = document.querySelector('.ehw-steps');
-  if (!steps) return;
-  steps.classList.add('ehw-steps--animate');
-  if (!('IntersectionObserver' in window)) { steps.classList.add('is-visible'); return; }
-  var io = new IntersectionObserver(function (entries) {
-    entries.forEach(function (e) {
-      if (!e.isIntersecting) return;
-      e.target.classList.add('is-visible');
-      io.unobserve(e.target);
-    });
-  }, { threshold: 0.25 });
-  io.observe(steps);
-})();
-</script>
-
 <!-- ═══════════════════════════════════════════════════════════
      BMD FEATURE
 ════════════════════════════════════════════════════════════════ -->
@@ -278,26 +258,72 @@
           Calculate Now — Free
         </a>
       </div>
-      <!-- Mock chart -->
-      <div class="ehw-bmd__chart">
-        <div class="ehw-bmd__chart-bar">
-          <div class="ehw-bmd__chart-dot"></div>
-          <div class="ehw-bmd__chart-dot"></div>
-          <div class="ehw-bmd__chart-dot"></div>
-        </div>
-        <div class="ehw-bmd__chart-area">
-          <svg style="position:absolute;bottom:0;width:100%;height:66%" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="gradR" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#E11D48" stop-opacity="0.3"/>
-                <stop offset="100%" stop-color="#E11D48" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path d="M0,100 L0,50 Q25,20 50,60 T100,30 L100,100 Z" fill="url(#gradR)" opacity="0.5"/>
-            <path d="M0,50 Q25,20 50,60 T100,30" fill="none" stroke="#E11D48" stroke-width="2"/>
+      <!-- Predicted BMD by age, straight from lib/bmd.js -->
+      <figure class="ehw-bmd__chart">
+        <figcaption class="ehw-bmd__chart-cap">
+          <strong>Predicted BMD by age</strong>
+          <span>This calculator's model at 158&nbsp;cm, for three body weights</span>
+        </figcaption>
+        <div class="ehw-bmd__plot">
+          <svg class="ehw-bmd__svg" viewBox="0 0 640 430" role="img" preserveAspectRatio="xMidYMid meet"
+               aria-label="Line chart: predicted bone mineral density falls with age, plotted for three body weights against the WHO Normal, Osteopenia and Osteoporosis bands. The 45 kg curve crosses into Osteopenia around age 70.">
+            <!-- WHO classification bands — thresholds from lib/bmd.js -->
+            <rect x="52" y="18" width="538" height="241.97" fill="#DCFCE7"/>
+            <rect x="52" y="259.97" width="538" height="105.71" fill="#FEF3C7"/>
+            <rect x="52" y="365.68" width="538" height="22.32" fill="#FFE4E6"/>
+            <text class="ehw-bmd__band-tag" x="60" y="252.97">Normal</text>
+            <text class="ehw-bmd__band-tag" x="60" y="358.68">Osteopenia</text>
+            <text class="ehw-bmd__band-tag" x="60" y="382">Osteoporosis</text>
+            <!-- WHO thresholds -->
+            <line class="ehw-bmd__thresh" x1="52" y1="259.97" x2="590" y2="259.97"/>
+            <text class="ehw-bmd__thresh-tag" x="45" y="262.97" text-anchor="end">0.738</text>
+            <line class="ehw-bmd__thresh" x1="52" y1="365.68" x2="590" y2="365.68"/>
+            <text class="ehw-bmd__thresh-tag" x="45" y="368.68" text-anchor="end">0.558</text>
+            <line class="ehw-bmd__axis" x1="52" y1="18" x2="52" y2="388"/>
+            <line class="ehw-bmd__axis" x1="52" y1="388" x2="590" y2="388"/>
+            <text class="ehw-bmd__tick" x="52" y="405" text-anchor="middle">30</text>
+            <text class="ehw-bmd__tick" x="159.6" y="405" text-anchor="middle">40</text>
+            <text class="ehw-bmd__tick" x="267.2" y="405" text-anchor="middle">50</text>
+            <text class="ehw-bmd__tick" x="374.8" y="405" text-anchor="middle">60</text>
+            <text class="ehw-bmd__tick" x="482.4" y="405" text-anchor="middle">70</text>
+            <text class="ehw-bmd__tick" x="590" y="405" text-anchor="middle">80</text>
+            <text class="ehw-bmd__tick" x="45" y="344.02" text-anchor="end">0.6</text>
+            <text class="ehw-bmd__tick" x="45" y="226.56" text-anchor="end">0.8</text>
+            <text class="ehw-bmd__tick" x="45" y="109.1" text-anchor="end">1.0</text>
+            <text class="ehw-bmd__axis-title" x="321" y="424" text-anchor="middle">Age (years)</text>
+            <text class="ehw-bmd__axis-title" x="14" y="203" text-anchor="middle" transform="rotate(-90 14 203)">BMD (g/cm&#178;)</text>
+            <!-- Model output at 158 cm, HAL 98 mm, NSA 127&#176;, body weight varied -->
+            <polyline class="ehw-bmd__line ehw-bmd__line--1" points="52,118.6 73.52,130.82 95.04,142.04 116.56,152.43 138.08,162.07 159.6,171.05 181.12,179.51 202.64,187.38 224.16,194.84 245.68,201.83 267.2,208.46 288.72,214.75 310.24,220.74 331.76,226.43 353.28,231.84 374.8,237 396.32,242 417.84,246.75 439.36,251.28 460.88,255.68 482.4,259.85 503.92,263.9 525.44,267.84 546.96,271.6 568.48,275.18 590,278.7" fill="none" stroke="#8A7F79" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <text class="ehw-bmd__series-tag" x="597" y="282.7">45 kg</text>
+            <polyline class="ehw-bmd__line ehw-bmd__line--2" points="52,78.2 73.52,91.24 95.04,103.28 116.56,114.43 138.08,124.77 159.6,134.4 181.12,143.39 202.64,151.85 224.16,159.77 245.68,167.29 267.2,174.4 288.72,181.15 310.24,187.55 331.76,193.6 353.28,199.42 374.8,204.94 396.32,210.28 417.84,215.33 439.36,220.21 460.88,224.91 482.4,229.37 503.92,233.72 525.44,237.89 546.96,241.94 568.48,245.81 590,249.57" fill="none" stroke="#5C534E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <text class="ehw-bmd__series-tag" x="597" y="253.57">62 kg</text>
+            <polyline class="ehw-bmd__line ehw-bmd__line--3" points="52,44.02 73.52,57.82 95.04,70.56 116.56,82.31 138.08,93.17 159.6,103.33 181.12,112.85 202.64,121.78 224.16,130.17 245.68,138.1 267.2,145.62 288.72,152.73 310.24,159.48 331.76,165.88 353.28,171.99 374.8,177.86 396.32,183.44 417.84,188.79 439.36,193.96 460.88,198.89 482.4,203.65 503.92,208.23 525.44,212.63 546.96,216.86 568.48,220.97 590,224.97" fill="none" stroke="#332C29" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <text class="ehw-bmd__series-tag" x="597" y="228.97">80 kg</text>
           </svg>
         </div>
-      </div>
+        <ul class="ehw-bmd__legend">
+          <li><span class="ehw-bmd__swatch" style="background:#8A7F79"></span>45&nbsp;kg</li>
+          <li><span class="ehw-bmd__swatch" style="background:#5C534E"></span>62&nbsp;kg</li>
+          <li><span class="ehw-bmd__swatch" style="background:#332C29"></span>80&nbsp;kg</li>
+        </ul>
+        <details class="ehw-bmd__data">
+          <summary>View the numbers</summary>
+          <table>
+            <caption>Predicted BMD (g/cm&#178;) at 158&nbsp;cm, HAL 98&nbsp;mm, NSA 127&#176;</caption>
+            <thead>
+              <tr><th scope="col">Age</th><th scope="col">45&nbsp;kg</th><th scope="col">62&nbsp;kg</th><th scope="col">80&nbsp;kg</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">30</th><td>0.979</td><td>1.048</td><td>1.106</td></tr>
+              <tr><th scope="row">40</th><td>0.889</td><td>0.952</td><td>1.005</td></tr>
+              <tr><th scope="row">50</th><td>0.826</td><td>0.884</td><td>0.933</td></tr>
+              <tr><th scope="row">60</th><td>0.777</td><td>0.832</td><td>0.878</td></tr>
+              <tr><th scope="row">70</th><td>0.738</td><td>0.790</td><td>0.834</td></tr>
+              <tr><th scope="row">80</th><td>0.706</td><td>0.756</td><td>0.798</td></tr>
+            </tbody>
+          </table>
+        </details>
+      </figure>
     </div>
   </div>
 </section>
@@ -483,5 +509,33 @@
     </div>
   </div>
 </section>
+
+<script>
+// Reveal sections as they scroll into view. Each hidden starting state lives
+// behind an --animate class that only this script adds, so with JavaScript off
+// everything renders normally instead of staying invisible.
+(function () {
+  var targets = [
+    { el: document.querySelector('.ehw-steps'),     cls: 'ehw-steps--animate' },
+    { el: document.querySelector('.ehw-bmd-wrap'),  cls: 'ehw-bmd-wrap--animate' }
+  ].filter(function (t) { return t.el; });
+  if (!targets.length) return;
+
+  targets.forEach(function (t) { t.el.classList.add(t.cls); });
+
+  if (!('IntersectionObserver' in window)) {
+    targets.forEach(function (t) { t.el.classList.add('is-visible'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      e.target.classList.add('is-visible');
+      io.unobserve(e.target);
+    });
+  }, { threshold: 0.25 });
+  targets.forEach(function (t) { io.observe(t.el); });
+})();
+</script>
 
 <%- include('partials/footer') %>

@@ -290,6 +290,11 @@ textarea.form-control { resize: vertical; min-height: 120px; }
 .ehw-sec { padding: 80px 0; }
 .ehw-sec--cream { background: var(--cream); }
 .ehw-sec--white { background: white; }
+/* Two same-coloured sections in a row stacked 80px + 80px of empty ground with
+   no colour change to justify it. Where the background does change, both
+   paddings stay — there the break is earned. */
+.ehw-sec--cream + .ehw-sec--cream,
+.ehw-sec--white + .ehw-sec--white { padding-top: 0; }
 .ehw-sec__inner { max-width:1280px;margin:0 auto;padding:0 24px; }
 .ehw-sec__head  { text-align:center;max-width:700px;margin:0 auto 56px; }
 .ehw-sec__head h2 { font-size:clamp(26px,4vw,38px);margin-bottom:14px; }
@@ -455,10 +460,56 @@ textarea.form-control { resize: vertical; min-height: 120px; }
   text-decoration:none;transition:all .3s;
 }
 .ehw-bmd__btn:hover { background:var(--stone-800);color:white; }
-.ehw-bmd__chart { background:white;border-radius:24px;box-shadow:0 8px 30px rgba(225,29,72,.06);border:1px solid var(--stone-100);overflow:hidden;padding:24px;aspect-ratio:4/3;display:flex;flex-direction:column; }
-.ehw-bmd__chart-bar { display:flex;gap:8px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--stone-100); }
-.ehw-bmd__chart-dot { width:12px;height:12px;border-radius:50%;background:var(--stone-200); }
-.ehw-bmd__chart-area { flex:1;background:var(--stone-50);border-radius:12px;position:relative;overflow:hidden; }
+/* The panel used to be fake browser chrome around a decorative squiggle, held
+   open at 4/3 with nothing in it. It now holds a real chart, so it sizes to its
+   own content instead of to a fixed ratio. */
+.ehw-bmd__chart {
+  background:white;border-radius:24px;box-shadow:0 8px 30px rgba(225,29,72,.06);
+  border:1px solid var(--stone-100);padding:24px;margin:0;min-width:0;
+}
+.ehw-bmd__chart-cap { display:flex;flex-direction:column;gap:2px;margin-bottom:14px; }
+.ehw-bmd__chart-cap strong { font-family:var(--font-serif);font-size:17px;color:var(--stone-dark); }
+.ehw-bmd__chart-cap span   { font-size:13px;color:var(--stone);line-height:1.5; }
+.ehw-bmd__plot { overflow-x:auto; }
+.ehw-bmd__svg { display:block;width:100%;height:auto;overflow:visible; }
+/* Below this width the 640-unit viewBox shrinks the axis type to ~5px. Hold the
+   plot at a legible size and let it scroll inside its own box, so the page
+   itself never scrolls sideways. The data table below is the non-scrolling
+   route to the same numbers. */
+@media (max-width: 640px) {
+  .ehw-bmd__svg { min-width: 520px; }
+}
+
+/* Recessive axes and grid; the data carries the emphasis. */
+.ehw-bmd__axis   { stroke:var(--stone-200);stroke-width:1; }
+.ehw-bmd__thresh { stroke:var(--stone-400);stroke-width:1;stroke-dasharray:4 4; }
+.ehw-bmd__tick,
+.ehw-bmd__thresh-tag { font-family:var(--font-sans);font-size:13px;fill:var(--stone); }
+.ehw-bmd__axis-title { font-family:var(--font-sans);font-size:13px;font-weight:700;fill:var(--stone); }
+.ehw-bmd__band-tag   { font-family:var(--font-sans);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;fill:var(--stone); }
+.ehw-bmd__series-tag { font-family:var(--font-sans);font-size:13px;font-weight:700;fill:var(--stone-dark); }
+
+.ehw-bmd__legend { list-style:none;display:flex;flex-wrap:wrap;gap:16px;margin:14px 0 0;padding:0;font-size:13px;color:var(--stone-dark); }
+.ehw-bmd__legend li { display:flex;align-items:center;gap:7px; }
+.ehw-bmd__swatch { width:14px;height:3px;border-radius:2px;flex-shrink:0; }
+
+.ehw-bmd__data { margin-top:12px;font-size:13px; }
+.ehw-bmd__data summary { cursor:pointer;color:var(--stone);font-weight:700;font-size:12px; }
+.ehw-bmd__data table { width:100%;border-collapse:collapse;margin-top:10px;font-size:12px; }
+.ehw-bmd__data caption { text-align:left;color:var(--stone);font-size:11px;padding-bottom:8px; }
+.ehw-bmd__data th, .ehw-bmd__data td { text-align:right;padding:4px 6px;border-bottom:1px solid var(--stone-100);color:var(--stone-dark); }
+.ehw-bmd__data thead th, .ehw-bmd__data tbody th { text-align:left;color:var(--stone); }
+
+/* Scroll reveal, same contract as the steps: the hidden state is scoped to the
+   --animate class the inline script adds, so JS-off renders normally. */
+.ehw-bmd-wrap--animate > * { opacity:0;transform:translateY(18px);transition:opacity .6s ease, transform .6s ease; }
+.ehw-bmd-wrap--animate > *:nth-child(2) { transition-delay:.12s; }
+.ehw-bmd-wrap--animate.is-visible > * { opacity:1;transform:none; }
+/* Each curve is dashed out to its own length, then drawn in. */
+.ehw-bmd-wrap--animate .ehw-bmd__line { stroke-dasharray:1000;stroke-dashoffset:1000;transition:stroke-dashoffset 1.4s ease .3s; }
+.ehw-bmd-wrap--animate .ehw-bmd__line--2 { transition-delay:.45s; }
+.ehw-bmd-wrap--animate .ehw-bmd__line--3 { transition-delay:.6s; }
+.ehw-bmd-wrap--animate.is-visible .ehw-bmd__line { stroke-dashoffset:0; }
 
 /* ── Pricing ────────────────────────────────────────────────────── */
 .ehw-pricing-grid { display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center; }
@@ -1242,6 +1293,11 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   .ehw-cards         { grid-template-columns:repeat(2,1fr); }
   .ehw-card--amber, .ehw-card--purple { margin-top:0; }
   .ehw-bmd-wrap      { grid-template-columns:1fr; padding:40px; }
+  /* Full width would blow the chart up to ~17px axis type, so cap and centre it.
+     Note: auto side margins would make this grid item size to fit-content
+     instead of to its grid area, so centre with justify-self and keep the width
+     definite. */
+  .ehw-bmd__chart    { width:100%; max-width:620px; justify-self:center; }
   .ehw-pricing-grid  { grid-template-columns:1fr; }
   .ehw-contact__card { grid-template-columns:1fr; }
   .ehw-footer__grid  { grid-template-columns:1fr 1fr; }
@@ -1636,10 +1692,13 @@ textarea.ehw-contact__input { height:120px;resize:none; }
      class arrives late or never. */
   .ehw-steps--animate .ehw-step,
   .ehw-steps--animate::before,
-  .ehw-steps--animate .ehw-step::after {
+  .ehw-steps--animate .ehw-step::after,
+  .ehw-bmd-wrap--animate > * {
     opacity: 1 !important;
     transform: none !important;
   }
+  /* Undrawn curves would otherwise stay hidden rather than merely un-animated. */
+  .ehw-bmd-wrap--animate .ehw-bmd__line { stroke-dashoffset: 0 !important; }
 
   *, *::before, *::after {
     animation-duration: .01ms !important;
