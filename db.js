@@ -121,7 +121,7 @@ async function init() {
       consumer_id INTEGER NOT NULL,
       profile_id INTEGER NOT NULL,
       product_code TEXT DEFAULT 'menopause_forecast',
-      amount_paise INTEGER DEFAULT 4900,
+      amount_paise INTEGER,   -- always written explicitly from PRICE_PAISE; never defaulted
       status TEXT DEFAULT 'created',
       gateway_order_id TEXT,
       gateway_payment_id TEXT,
@@ -174,6 +174,17 @@ async function init() {
       sess       TEXT NOT NULL,
       expires_at INTEGER NOT NULL
     );
+
+    -- Indexes for the lookups that run on every request or payment. Without
+    -- these each one is a full table scan; fine at three rows, not at scale.
+    -- Columns that are already PRIMARY KEY or UNIQUE (consumers.email,
+    -- bmd.guid, sessions.sid) are indexed implicitly and are not repeated.
+    CREATE INDEX IF NOT EXISTS idx_profiles_consumer   ON consumer_profiles (consumer_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_profile      ON consumer_orders (profile_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_gateway      ON consumer_orders (gateway_order_id);
+    CREATE INDEX IF NOT EXISTS idx_orders_status       ON consumer_orders (status);
+    CREATE INDEX IF NOT EXISTS idx_results_order       ON mp_results_v2 (order_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires    ON sessions (expires_at);
   `);
 
   // Column migrations (safe no-ops when the column already exists)
@@ -186,6 +197,12 @@ async function init() {
   // Optional phone number, captured at signup, so gated forecast leads can
   // be followed up with a free wa.me click-to-chat link from the admin panel.
   await addColumn("ALTER TABLE consumers ADD COLUMN phone TEXT");
+
+  // These two index columns are added by the migrations above, so they cannot
+  // be indexed in the CREATE TABLE block — on a fresh database the column does
+  // not exist yet and startup fails.
+  await addColumn("CREATE INDEX IF NOT EXISTS idx_consumers_verify ON consumers (verification_token)");
+  await addColumn("CREATE INDEX IF NOT EXISTS idx_consumers_reset  ON consumers (reset_token)");
   await addColumn("ALTER TABLE bmdlogin ADD COLUMN disabled INTEGER DEFAULT 0");
   await addColumn("ALTER TABLE bmd ADD COLUMN clinic_username TEXT");
   await addColumn("ALTER TABLE bmd ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP");

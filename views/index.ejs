@@ -33,16 +33,10 @@
       <div class="ehw-hero__social">
         <div class="ehw-hero__avatars">
           <div class="ehw-hero__avatar">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <div class="ehw-hero__avatar">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <div class="ehw-hero__avatar">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
           </div>
         </div>
-        <p>Join 12,000+ women taking control of their health today</p>
+        <p>Built on peer-reviewed AMH research &middot; your result stays private</p>
       </div>
     </div>
 
@@ -56,8 +50,8 @@
         <div>
           <p class="ehw-hero__deal-label">Limited Offer</p>
           <div class="ehw-hero__deal-price">
-            <strong>&#8377;49</strong>
-            <del>&#8377;199</del>
+            <strong>&#8377;<%= priceRupees %></strong>
+            <del>&#8377;<%= listPriceRupees %></del>
           </div>
         </div>
       </div>
@@ -78,20 +72,13 @@
 <section class="ehw-strip">
   <div class="ehw-strip__inner">
     <div class="ehw-strip__item">
-      <div class="ehw-strip__avatars">
-        <div class="ehw-strip__avatar" style="background:var(--rose-200)"></div>
-        <div class="ehw-strip__avatar" style="background:var(--amber-200)"></div>
-        <div class="ehw-strip__avatar" style="background:var(--green-200)"></div>
-        <div class="ehw-strip__avatar" style="background:var(--purple-200)"></div>
-      </div>
-      <span>12,000+ women <span style="color:var(--rose)">already using it</span></span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+      <span>Based on <span style="color:var(--rose)">published research</span></span>
     </div>
     <div class="ehw-strip__divider"></div>
     <div class="ehw-strip__item">
-      <div class="ehw-strip__stars">
-        &#9733;&#9733;&#9733;&#9733;&#9733;
-      </div>
-      <span>4.9 / 5 <span style="color:var(--stone);font-weight:400">from users</span></span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--amber-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span>Result in <span style="color:var(--stone);font-weight:400">under 2 minutes</span></span>
     </div>
     <div class="ehw-strip__divider"></div>
     <div class="ehw-strip__item">
@@ -101,7 +88,7 @@
     <div class="ehw-strip__divider"></div>
     <div class="ehw-strip__item">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      <span>Special Offer: <span class="ehw-strip__price">&#8377;49</span> <span class="ehw-strip__orig">&#8377;199</span></span>
+      <span>Special Offer: <span class="ehw-strip__price">&#8377;<%= priceRupees %></span> <span class="ehw-strip__orig">&#8377;<%= listPriceRupees %></span></span>
     </div>
   </div>
 </section>
@@ -214,7 +201,7 @@
     <div class="ehw-steps__ctas">
       <a href="/forecasting.asp" class="ehw-steps__btn-p">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-        Get Started at &#8377;49
+        Get Started at &#8377;<%= priceRupees %>
       </a>
       <span class="ehw-steps__btn-s" style="cursor:default">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -367,10 +354,10 @@
             Special Offer — Limited Time
           </div>
           <div class="ehw-pricing__price-row">
-            <span class="ehw-pricing__amount">&#8377;49</span>
+            <span class="ehw-pricing__amount">&#8377;<%= priceRupees %></span>
             <div class="ehw-pricing__orig">
-              <del>&#8377;199</del>
-              <span>75% off</span>
+              <del>&#8377;<%= listPriceRupees %></del>
+              <span><%= discountPct %>% off</span>
             </div>
           </div>
           <p class="ehw-pricing__sub">One-time access &middot; No subscription</p>
@@ -392,20 +379,20 @@
               Private &amp; secure results
             </li>
           </ul>
-          <button class="ehw-pricing__buy" onclick="window.location='/signup'">Get Started Free — pay &#8377;49 per test</button>
+          <button class="ehw-pricing__buy" onclick="window.location='/signup'">Get Started Free — pay &#8377;<%= priceRupees %> per test</button>
           <p class="ehw-pricing__note">Secure payment &middot; Instant access</p>
         </div>
       </div>
       <!-- Value Props -->
       <div class="ehw-pricing__values">
-        <h3>Why &#8377;49 is worth every rupee</h3>
+        <h3>Why &#8377;<%= priceRupees %> is worth every rupee</h3>
         <div class="ehw-value-item">
           <div class="ehw-value-icon ehw-value-icon--green">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
           </div>
           <div>
             <h4>Clinically grounded models</h4>
-            <p>Our AMH-based menopause forecasting and BMD algorithms are built on peer-reviewed research.</p>
+            <p>The AMH-based menopause forecast is built on peer-reviewed research, not a rule of thumb.</p>
           </div>
         </div>
         <div class="ehw-value-item">
@@ -422,8 +409,8 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           </div>
           <div>
-            <h4>Trusted by 12,000+ women</h4>
-            <p>Women across India use e-healthwatch to understand their health journey on their own terms.</p>
+            <h4>One payment, no subscription</h4>
+            <p>Pay per test. No recurring charge, no auto-renewal, nothing stored on file to bill you again.</p>
           </div>
         </div>
         <div class="ehw-value-item">
@@ -431,8 +418,8 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           </div>
           <div>
-            <h4>4.9 / 5 user satisfaction</h4>
-            <p>Users consistently rate us highly for clarity, accuracy, and ease of use.</p>
+            <h4>A report you keep</h4>
+            <p>Your result comes with a plain-language interpretation and a downloadable PDF you can revisit or take to your doctor.</p>
           </div>
         </div>
       </div>

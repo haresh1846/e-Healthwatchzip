@@ -58,7 +58,7 @@
         </div>
         <div class="result-fact">
           <div class="result-fact-icon">🔄</div>
-          <div><strong>Track over time</strong><p>Retake the test with an updated AMH value (₹49) to see how your forecast changes. AMH naturally declines with age.</p></div>
+          <div><strong>Track over time</strong><p>Retake the test with an updated AMH value (₹<%= priceRupees %>) to see how your forecast changes. AMH naturally declines with age.</p></div>
         </div>
       </div>
     </div>
@@ -76,7 +76,7 @@
         Download report (PDF)
       </a>
       <a href="/forecast-report/<%= profile.id %>" class="result-retake">View printable report</a>
-      <a href="/forecast/<%= profile.id %>" class="result-retake">Retake with new AMH value · ₹49</a>
+      <a href="/forecast/<%= profile.id %>" class="result-retake">Retake with new AMH value · ₹<%= priceRupees %></a>
       <a href="/dashboard" class="auth-submit" style="display:inline-flex;width:auto;">Back to Dashboard →</a>
     </div>
 

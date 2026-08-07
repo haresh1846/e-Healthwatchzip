@@ -47,6 +47,15 @@ function getRazorpay() {
   return razorpayClient;
 }
 
+// ─── Pricing ─────────────────────────────────────────────────────────────────
+// Single source of truth: the charged amount, the three server-side guards and
+// every price shown on the site all derive from these. Changing the price means
+// changing it here and nowhere else.
+const PRICE_PAISE      = 14900;          // what Razorpay actually charges
+const PRICE_RUPEES     = PRICE_PAISE / 100;
+const LIST_PRICE_RUPEES = 1490;          // pre-discount list price
+const DISCOUNT_PCT     = Math.round((1 - PRICE_RUPEES / LIST_PRICE_RUPEES) * 100);
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -132,8 +141,8 @@ app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), async (
       return res.json({ status: 'unknown_order' });
     }
 
-    // Guard: amount and currency must match our product (4900 paise, INR)
-    if (payment.amount !== 4900 || payment.currency !== 'INR') {
+    // Guard: amount and currency must match our product
+    if (payment.amount !== PRICE_PAISE || payment.currency !== 'INR') {
       console.error('[Razorpay webhook] Amount/currency mismatch for order', orderId, {
         amount: payment.amount, currency: payment.currency,
       });
@@ -184,6 +193,11 @@ app.use(session({
 app.use((req, res, next) => {
   res.locals.consumerId   = req.session.consumerId   || null;
   res.locals.consumerName = req.session.consumerName || '';
+  // Templates render the price from these, never from a hardcoded number, so
+  // what a visitor is quoted can never disagree with what Razorpay charges.
+  res.locals.priceRupees     = PRICE_RUPEES;
+  res.locals.listPriceRupees = LIST_PRICE_RUPEES;
+  res.locals.discountPct     = DISCOUNT_PCT;
   next();
 });
 
@@ -830,7 +844,7 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
 
     // Create order in Razorpay
     const rzpOrder = await razorpay.orders.create({
-      amount:   4900,
+      amount:   PRICE_PAISE,
       currency: 'INR',
       receipt,
       notes: {
@@ -841,8 +855,8 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
 
     // Persist the order record (status = created)
     await db.prepare(
-      'INSERT INTO consumer_orders (consumer_id, profile_id, status, gateway_order_id) VALUES (?, ?, ?, ?)'
-    ).run(req.session.consumerId, profile.id, 'created', rzpOrder.id);
+      'INSERT INTO consumer_orders (consumer_id, profile_id, amount_paise, status, gateway_order_id) VALUES (?, ?, ?, ?, ?)'
+    ).run(req.session.consumerId, profile.id, PRICE_PAISE, 'created', rzpOrder.id);
 
     // Key pendingForecast by gateway_order_id so multi-tab/multi-order scenarios
     // cannot mix up form inputs belonging to different orders.
@@ -968,8 +982,8 @@ app.post('/forecast/:profileId/verify', requireConsumer, async (req, res) => {
     return res.status(400).render('payment-error', { message: 'Order not found or already processed. Please contact support if you were charged.', profileId: profile.id });
   }
 
-  // Enforce expected amount for this product (4900 paise = ₹49)
-  if (orderRow.amount_paise !== 4900) {
+  // Enforce expected amount for this product
+  if (orderRow.amount_paise !== PRICE_PAISE) {
     console.error('[Razorpay verify] Amount mismatch on order', orderRow.id, orderRow.amount_paise);
     return res.status(400).render('payment-error', { message: 'Order amount mismatch. Please contact support.', profileId: profile.id });
   }

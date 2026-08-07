@@ -217,6 +217,25 @@ async function test(name, fn) {
     assert.ok((await r.text()).includes('Legacy BMD Record'));
   });
 
+  await test('3d2. Order rows record the charged amount, not a schema default', async () => {
+    // The verify guard compares orderRow.amount_paise against the price the
+    // gateway was told to charge. If the INSERT ever relies on a column default
+    // again, every payment gets rejected *after* the customer is charged.
+    const cols = db.prepare('PRAGMA table_info(consumer_orders)').all();
+    const amountCol = cols.find(c => c.name === 'amount_paise');
+    assert.ok(amountCol, 'consumer_orders must have amount_paise');
+    assert.equal(amountCol.dflt_value, null, 'amount_paise must have no default — it is written explicitly');
+
+    const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    assert.ok(/INSERT INTO consumer_orders \([^)]*amount_paise/.test(src),
+      'the order INSERT must name amount_paise explicitly');
+    const priceMatch = src.match(/const PRICE_PAISE\s*=\s*(\d+)/);
+    assert.ok(priceMatch, 'PRICE_PAISE must be defined in one place');
+    const guardCount = (src.match(/PRICE_PAISE/g) || []).length;
+    assert.ok(guardCount >= 4,
+      `expected the order amount and all three guards to use PRICE_PAISE, found ${guardCount} references`);
+  });
+
   await test('3e. BMD waitlist records a signup', async () => {
     const { cookie, token } = await freshSession('/bmd.asp');
     const r = await post('/bmd-waitlist', cookie, {
