@@ -40,7 +40,7 @@
       </div>
       <div class="test-card-actions">
         <a href="/my-result/<%= profile.id %>" class="auth-submit" style="display:inline-flex;width:auto;">View Full Result →</a>
-        <a href="/forecast/<%= profile.id %>" class="prof-retake">Retake with new AMH value · ₹49</a>
+        <a href="/forecast/<%= profile.id %>" class="prof-retake">Retake with new AMH value · ₹<%= priceRupees %></a>
       </div>
     </div>
 
@@ -78,9 +78,9 @@
 
       <div class="test-price-row">
         <div class="test-price-info">
-          <span class="test-price-main">₹49</span>
-          <del>₹199</del>
-          <span class="test-price-tag">75% off · One-time payment</span>
+          <span class="test-price-main">₹<%= priceRupees %></span>
+          <del>₹<%= listPriceRupees %></del>
+          <span class="test-price-tag"><%= discountPct %>% off · One-time payment</span>
         </div>
         <a href="/forecast/<%= profile.id %>" class="auth-submit" style="display:inline-flex;width:auto;">
           Take the Test →

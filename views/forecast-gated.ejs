@@ -46,9 +46,9 @@
             </ul>
           </div>
           <div class="pay-summary-right">
-            <div class="pay-price-main">₹49</div>
-            <del class="pay-price-orig">₹199</del>
-            <div class="pay-price-tag">75% off · One-time</div>
+            <div class="pay-price-main">₹<%= priceRupees %></div>
+            <del class="pay-price-orig">₹<%= listPriceRupees %></del>
+            <div class="pay-price-tag"><%= discountPct %>% off · One-time</div>
           </div>
         </div>
 
@@ -97,7 +97,7 @@
             </div>
 
             <button type="submit" class="auth-submit" style="margin-top:8px;">
-              Pay ₹49 &amp; Get My Forecast →
+              Pay ₹<%= priceRupees %> &amp; Get My Forecast →
             </button>
             <p style="text-align:center;font-size:12px;color:var(--stone);margin-top:10px;">
               🔒 Secure · No subscription · Result stored permanently on your profile
@@ -202,7 +202,7 @@
           </form>
 
           <button id="rzpPayBtn" class="auth-submit" style="margin-top:8px;" onclick="openRazorpay()">
-            Pay ₹49 Securely →
+            Pay ₹<%= priceRupees %> Securely →
           </button>
           <p style="text-align:center;font-size:12px;color:var(--stone);margin-top:10px;">
             🔒 Powered by Razorpay · UPI · Cards · Net Banking · Wallets
@@ -235,7 +235,7 @@
                 modal: {
                   ondismiss: function() {
                     var btn = document.getElementById('rzpPayBtn');
-                    btn.textContent = 'Pay ₹49 Securely →';
+                    btn.textContent = 'Pay ₹<%= priceRupees %> Securely →';
                     btn.disabled = false;
                   }
                 }

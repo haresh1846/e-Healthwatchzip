@@ -13,7 +13,7 @@
       </a>
 
       <h1 class="auth-title">Create your free account</h1>
-      <p class="auth-sub">Join 12,000+ women taking control of their health</p>
+      <p class="auth-sub">Free to create &middot; pay only when you run a forecast</p>
 
       <% if (typeof error !== 'undefined' && error) { %>
         <div class="auth-alert"><%= error %></div>
@@ -79,14 +79,14 @@
             <span class="auth-feat-icon auth-feat-green">🔒</span>
             <div>
               <strong>Results stored forever</strong>
-              <p>Pay once — ₹49. Revisit your result any time, always free</p>
+              <p>Pay once — ₹<%= priceRupees %>. Revisit your result any time, always free</p>
             </div>
           </li>
         </ul>
         <div class="auth-price-badge">
           <div>
             <div class="auth-price-label">One-time test fee</div>
-            <div class="auth-price-row"><span class="auth-price-amt">₹49</span><del>₹199</del><span class="auth-discount">75% off</span></div>
+            <div class="auth-price-row"><span class="auth-price-amt">₹<%= priceRupees %></span><del>₹<%= listPriceRupees %></del><span class="auth-discount"><%= discountPct %>% off</span></div>
           </div>
         </div>
       </div>

@@ -47,12 +47,68 @@ function getRazorpay() {
   return razorpayClient;
 }
 
+// ─── Business identity ───────────────────────────────────────────────────────
+// Razorpay onboarding (RBI Payment Aggregator Guidelines) requires a working
+// phone, email and registered address to be published. These come from the
+// environment and deliberately have NO placeholder fallback: an unset value
+// renders nothing at all, so the site can never ship a fake phone number or
+// address the way it previously did.
+const BUSINESS = {
+  name:    process.env.BUSINESS_NAME    || 'e-healthwatch',
+  email:   process.env.BUSINESS_EMAIL   || '',
+  phone:   process.env.BUSINESS_PHONE   || '',
+  address: process.env.BUSINESS_ADDRESS || '',
+};
+
+// ─── Pricing ─────────────────────────────────────────────────────────────────
+// Single source of truth: the charged amount, the three server-side guards and
+// every price shown on the site all derive from these. Changing the price means
+// changing it here and nowhere else.
+const PRICE_PAISE      = 14900;          // what Razorpay actually charges
+const PRICE_RUPEES     = PRICE_PAISE / 100;
+const LIST_PRICE_RUPEES = 1490;          // pre-discount list price
+const DISCOUNT_PCT     = Math.round((1 - PRICE_RUPEES / LIST_PRICE_RUPEES) * 100);
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Behind Replit's (or any host's) TLS-terminating proxy — needed so
 // `secure: 'auto'` session cookies detect HTTPS from X-Forwarded-Proto.
 app.set('trust proxy', 1);
+
+// ─── Security headers ────────────────────────────────────────────────────────
+// Note on CSP: the templates carry ~157 inline style attributes, 10 inline
+// <script> blocks and a handful of onclick handlers, so 'unsafe-inline' is
+// unavoidable without a rewrite. The policy is still worth having — it pins
+// which *origins* can supply scripts, frames and connections, so an injected
+// <script src="evil.com"> is blocked even though an injected inline handler
+// would not be. Razorpay's checkout needs script, frame and connect access,
+// and removing those entries breaks payments.
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "img-src 'self' data: https:",
+    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "script-src 'self' 'unsafe-inline' https://checkout.razorpay.com",
+    "frame-src https://api.razorpay.com https://checkout.razorpay.com",
+    "connect-src 'self' https://api.razorpay.com https://lumberjack.razorpay.com",
+  ].join('; '));
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(self)');
+  // Only meaningful over TLS; the proxy terminates HTTPS, hence trust proxy above.
+  if (req.secure) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 // View engine
 app.set('view engine', 'ejs');
@@ -132,8 +188,8 @@ app.post('/razorpay-webhook', express.raw({ type: 'application/json' }), async (
       return res.json({ status: 'unknown_order' });
     }
 
-    // Guard: amount and currency must match our product (4900 paise, INR)
-    if (payment.amount !== 4900 || payment.currency !== 'INR') {
+    // Guard: amount and currency must match our product
+    if (payment.amount !== PRICE_PAISE || payment.currency !== 'INR') {
       console.error('[Razorpay webhook] Amount/currency mismatch for order', orderId, {
         amount: payment.amount, currency: payment.currency,
       });
@@ -184,6 +240,14 @@ app.use(session({
 app.use((req, res, next) => {
   res.locals.consumerId   = req.session.consumerId   || null;
   res.locals.consumerName = req.session.consumerName || '';
+  // Templates render the price from these, never from a hardcoded number, so
+  // what a visitor is quoted can never disagree with what Razorpay charges.
+  res.locals.priceRupees     = PRICE_RUPEES;
+  res.locals.listPriceRupees = LIST_PRICE_RUPEES;
+  res.locals.discountPct     = DISCOUNT_PCT;
+  res.locals.business        = BUSINESS;
+  // Absolute base for canonical + og:image; falls back to the live host.
+  res.locals.baseUrl         = (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
   next();
 });
 
@@ -264,11 +328,26 @@ app.get(['/', '/index.asp'], async (req, res) => {
 // Shared contact-form email delivery, used by the home page and /contact.asp.
 // Failures are logged, never surfaced — a send failure must never break the page.
 async function sendContactEmail({ fname, lname, email, phone, comment }) {
-  console.log('[Contact Form]', { fname, lname, email, phone, comment });
+  // Don't put the visitor's name, email, phone or message into the logs.
+  console.log('[Contact Form] submission received');
+
+  // Store first, email second. Delivery is best-effort and its failure is
+  // swallowed so the page never breaks — which previously meant a failed send
+  // lost the enquiry entirely while still showing "Message sent!".
+  let messageId = null;
+  try {
+    const res = await db.prepare(
+      'INSERT INTO contact_messages (first_name, last_name, email, phone, message) VALUES (?, ?, ?, ?, ?)'
+    ).run(fname || null, lname || null, email || null, phone || null, comment || null);
+    messageId = res.lastInsertRowid;
+  } catch (err) {
+    console.error('[Contact Form] Failed to store message:', err.message);
+  }
+
   try {
     const transporter = createMailTransporter();
     if (!transporter) {
-      console.warn('[Contact Form] GMAIL_USER or GMAIL_APP_PASSWORD not set — email not sent');
+      console.warn('[Contact Form] GMAIL_USER or GMAIL_APP_PASSWORD not set — email not sent (message is stored)');
       return;
     }
     const ownerEmail = process.env.GMAIL_USER;
@@ -293,8 +372,11 @@ async function sendContactEmail({ fname, lname, email, phone, comment }) {
       ].join('\n'),
     });
     console.log('[Contact Form] Email sent to', ownerEmail);
+    if (messageId) {
+      await db.prepare('UPDATE contact_messages SET emailed = 1 WHERE id = ?').run(messageId);
+    }
   } catch (err) {
-    console.error('[Contact Form] Failed to send email:', err.message);
+    console.error('[Contact Form] Failed to send email:', err.message, '(message is stored)');
   }
 }
 
@@ -355,7 +437,45 @@ app.get('/organ.asp', (req, res) => res.render('organ'));
 app.get('/data.asp', (req, res) => res.render('data'));
 
 // Privacy policy (DPDP notice)
+// robots.txt and sitemap.xml are generated so the host always matches the
+// deployment rather than being baked into a static file.
+app.get('/robots.txt', (req, res) => {
+  const base = (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  res.type('text/plain').send([
+    'User-agent: *',
+    'Disallow: /admin',
+    'Disallow: /dashboard',
+    'Disallow: /my-result',
+    'Disallow: /profile',
+    'Disallow: /orders',
+    'Disallow: /bmd-report',
+    'Allow: /',
+    '',
+    `Sitemap: ${base}/sitemap.xml`,
+    '',
+  ].join('\n'));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const base = (process.env.APP_BASE_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const paths = [
+    ['/', '1.0'], ['/forecasting.asp', '0.9'], ['/bmd.asp', '0.6'],
+    ['/gynaecology.asp', '0.7'], ['/pregnancy.asp', '0.7'], ['/menopause.asp', '0.7'],
+    ['/health.asp', '0.7'], ['/organ.asp', '0.6'], ['/data.asp', '0.6'],
+    ['/contact.asp', '0.5'], ['/privacy', '0.3'], ['/terms', '0.3'], ['/refund', '0.3'],
+  ];
+  res.type('application/xml').send(
+    '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    paths.map(([p, pr]) => `  <url><loc>${base}${p}</loc><priority>${pr}</priority></url>`).join('\n') +
+    '\n</urlset>\n'
+  );
+});
+
 app.get('/privacy', (req, res) => res.render('privacy'));
+// Terms and refund policy are a Razorpay onboarding requirement, not optional.
+app.get('/terms',  (req, res) => res.render('terms'));
+app.get('/refund', (req, res) => res.render('refund'));
 
 // Contact
 app.get(['/contact.asp', '/Contact.asp'], (req, res) => res.render('contact', { contactSuccess: false }));
@@ -607,7 +727,15 @@ async function sendPasswordResetEmail(req, consumer) {
   const link = `${appBaseUrl(req)}/reset-password/${token}`;
   const transporter = createMailTransporter();
   if (!transporter) {
-    console.warn('[password-reset] Email not configured — reset link for', consumer.email, 'is:', link);
+    // The link is a bearer token for the account, and server logs are retained
+    // and readable — logging it in production would turn log access into
+    // account takeover. Outside production it's the only way to complete a
+    // reset without mail configured, so keep it for local dev and tests.
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[password-reset] Email not configured — reset requested for consumer id', consumer.id, '(link withheld from logs)');
+    } else {
+      console.warn('[password-reset] Email not configured — reset link for', consumer.email, 'is:', link);
+    }
     return;
   }
   try {
@@ -830,7 +958,7 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
 
     // Create order in Razorpay
     const rzpOrder = await razorpay.orders.create({
-      amount:   4900,
+      amount:   PRICE_PAISE,
       currency: 'INR',
       receipt,
       notes: {
@@ -841,8 +969,8 @@ app.post('/forecast/:profileId', requireConsumer, async (req, res) => {
 
     // Persist the order record (status = created)
     await db.prepare(
-      'INSERT INTO consumer_orders (consumer_id, profile_id, status, gateway_order_id) VALUES (?, ?, ?, ?)'
-    ).run(req.session.consumerId, profile.id, 'created', rzpOrder.id);
+      'INSERT INTO consumer_orders (consumer_id, profile_id, amount_paise, status, gateway_order_id) VALUES (?, ?, ?, ?, ?)'
+    ).run(req.session.consumerId, profile.id, PRICE_PAISE, 'created', rzpOrder.id);
 
     // Key pendingForecast by gateway_order_id so multi-tab/multi-order scenarios
     // cannot mix up form inputs belonging to different orders.
@@ -968,8 +1096,8 @@ app.post('/forecast/:profileId/verify', requireConsumer, async (req, res) => {
     return res.status(400).render('payment-error', { message: 'Order not found or already processed. Please contact support if you were charged.', profileId: profile.id });
   }
 
-  // Enforce expected amount for this product (4900 paise = ₹49)
-  if (orderRow.amount_paise !== 4900) {
+  // Enforce expected amount for this product
+  if (orderRow.amount_paise !== PRICE_PAISE) {
     console.error('[Razorpay verify] Amount mismatch on order', orderRow.id, orderRow.amount_paise);
     return res.status(400).render('payment-error', { message: 'Order amount mismatch. Please contact support.', profileId: profile.id });
   }
@@ -1195,6 +1323,7 @@ async function getTabCounts() {
     bmdCount:    (await db.prepare('SELECT COUNT(*) as c FROM bmd').get() || {}).c || 0,
     leadCount:   (await db.prepare('SELECT COUNT(*) as c FROM forecast_gate_leads').get() || {}).c || 0,
     waitCount:   (await db.prepare('SELECT COUNT(*) as c FROM bmd_waitlist').get() || {}).c || 0,
+    msgCount:    (await db.prepare('SELECT COUNT(*) as c FROM contact_messages').get() || {}).c || 0,
   };
 }
 
@@ -1401,6 +1530,29 @@ app.get('/admin/forecast-leads', requireAdmin, async (req, res) => {
   res.render('admin/forecast-leads', { leads: leadsWithWa, ...await getTabCounts() });
 });
 
+// GET /admin/messages — contact enquiries, including any the mailer failed on.
+app.get('/admin/messages', requireAdmin, async (req, res) => {
+  const rows = await db.prepare(
+    'SELECT id, first_name, last_name, email, phone, message, emailed, created_at ' +
+    'FROM contact_messages ORDER BY id DESC'
+  ).all();
+
+  if (req.query.export === 'csv') {
+    return sendCsv(res, 'contact-messages.csv', [
+      { key: 'id',         label: 'ID' },
+      { key: 'first_name', label: 'First Name' },
+      { key: 'last_name',  label: 'Last Name' },
+      { key: 'email',      label: 'Email' },
+      { key: 'phone',      label: 'Phone' },
+      { key: 'message',    label: 'Message' },
+      { key: 'emailed',    label: 'Emailed' },
+      { key: 'created_at', label: 'Received' },
+    ], rows);
+  }
+
+  res.render('admin/messages', { rows, ...await getTabCounts() });
+});
+
 // GET /admin/bmd-waitlist — people to notify when the BMD calculator returns.
 app.get('/admin/bmd-waitlist', requireAdmin, async (req, res) => {
   const rows = await db.prepare(
@@ -1528,6 +1680,12 @@ app.get('/admin/analytics', requireAdmin, async (req, res) => {
 // Final error handler — logs the real error, shows the visitor a clean page,
 // and (until launch is stable) includes the message to make remote debugging
 // possible without dashboard access.
+// 404 — must sit after every route, before the error handler. Without this
+// Express serves its own unstyled "Cannot GET /path" response.
+app.use((req, res) => {
+  res.status(404).render('404');
+});
+
 app.use((err, req, res, next) => {
   console.error('[error]', req.method, req.path, err);
   if (res.headersSent) return next(err);

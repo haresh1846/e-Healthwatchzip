@@ -1,0 +1,68 @@
+<%- include('partials/header', { pageTitle: 'Terms of Service — e-healthwatch', pageDesc: 'The terms governing your use of e-healthwatch, its menopause forecast, and the guides published on this site.' }) %>
+
+<section id="banner-section">
+  <div class="container-fluid">
+    <div class="row">
+      <div class="banner-placeholder text-center">
+        <h2>Terms of Service</h2>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="about-cont">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+        <div class="aboutpage-content" style="max-width:760px;margin:0 auto;">
+
+          <p style="color:var(--stone);font-size:13px;">Last updated: August 2026 · Please read these terms before creating an account or making a payment.</p>
+
+          <h2 class="aboutpage-title">Who we are</h2>
+          <p><%= business.name %> ("we", "us") operates this website and the tools published on it. By creating an account, running a forecast, or making a payment, you agree to these terms.</p>
+
+          <h2 class="aboutpage-title">This is not medical advice</h2>
+          <p>Everything on this site — including the Menopause Forecast, the guides, and any report we generate — is <strong>health information, not a medical diagnosis or treatment recommendation</strong>. Our forecast is a statistical estimate derived from published research on anti-Müllerian hormone (AMH) levels. It describes what the model predicts for inputs like yours; it does not tell you what will happen to you.</p>
+          <p>Individual outcomes vary with medical history, medication, surgery, genetics and other factors the model does not see. <strong>Always consult a qualified gynaecologist or physician</strong> before making any decision about your health, fertility or treatment. Never delay seeking medical advice because of something you read here.</p>
+          <p>If you are experiencing a medical emergency, contact your local emergency services immediately.</p>
+
+          <h2 class="aboutpage-title">Your account</h2>
+          <ul style="line-height:1.9;">
+            <li>You must be 18 or older to create an account.</li>
+            <li>You are responsible for the accuracy of the values you enter. A forecast computed from an incorrect AMH value or age will be wrong, and that is not a fault in the service.</li>
+            <li>You are responsible for keeping your password confidential. Tell us promptly if you believe your account has been accessed by someone else.</li>
+            <li>You may create health profiles for people other than yourself only if you have their consent to do so.</li>
+          </ul>
+
+          <h2 class="aboutpage-title">Payment</h2>
+          <p>The Menopause Forecast is charged at <strong>&#8377;<%= priceRupees %></strong> per test as a one-time payment. There is no subscription, no recurring charge, and no auto-renewal. The price shown to you before payment is the price charged.</p>
+          <p>Payments are processed by Razorpay. We never see or store your card, UPI or banking details. Prices are in Indian Rupees and include any applicable taxes unless stated otherwise.</p>
+          <p>Our <a href="/refund">Refund &amp; Cancellation Policy</a> forms part of these terms.</p>
+
+          <h2 class="aboutpage-title">Acceptable use</h2>
+          <ul style="line-height:1.9;">
+            <li>Do not attempt to bypass payment, probe the service for vulnerabilities without our written permission, or automate access to it.</li>
+            <li>Do not resell, redistribute or present our forecasts or reports as your own or as a clinical service.</li>
+            <li>Do not upload anything unlawful, or anyone else's personal data without their consent.</li>
+          </ul>
+          <p>We may suspend or close an account that breaches these terms.</p>
+
+          <h2 class="aboutpage-title">Availability and changes</h2>
+          <p>We aim to keep the service available but do not guarantee uninterrupted access. Features may change or be withdrawn — the BMD Calculator, for example, is currently unavailable while its model is recalibrated. Where a change affects something you have already paid for, we will honour what you paid for.</p>
+
+          <h2 class="aboutpage-title">Limitation of liability</h2>
+          <p>To the extent permitted by law, our total liability arising from your use of the service is limited to the amount you paid us in the twelve months before the claim. We are not liable for indirect or consequential loss, or for decisions taken on the basis of information published here rather than on qualified medical advice. Nothing in these terms limits liability that cannot lawfully be limited.</p>
+
+          <h2 class="aboutpage-title">Governing law</h2>
+          <p>These terms are governed by the laws of India, and the courts of India have jurisdiction over any dispute arising from them.</p>
+
+          <h2 class="aboutpage-title">Contact</h2>
+          <p>Questions about these terms can be sent through our <a href="/contact.asp">contact page</a><% if (business.email) { %> or to <a href="mailto:<%= business.email %>"><%= business.email %></a><% } %>.</p>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>
