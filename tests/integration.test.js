@@ -272,6 +272,27 @@ async function test(name, fn) {
     assert.ok(csp.includes('https://*.clarity.ms'), 'CSP must allow Clarity or it will be blocked');
   });
 
+  await test('4a4. Signed-in pages are masked from session recording; public pages are not', async () => {
+    // Clarity's dashboard mode is Balanced, which masks only numbers and email
+    // addresses — not names, relationship labels or cycle answers. Privacy here
+    // must not depend on that setting, so every authenticated page masks its
+    // whole body. Public pages stay readable, which is where heatmaps help.
+    for (const p of ['/', '/gynaecology.asp', '/bmd.asp']) {
+      const html = await (await fetch(BASE + p)).text();
+      const body = (html.match(/<body[^>]*>/) || [''])[0];
+      assert.ok(!body.includes('clarity-mask'), p + ' is public and should stay readable');
+    }
+    for (const p of ['/dashboard', '/orders']) {
+      const html = await (await fetch(BASE + p, { headers: { cookie: consumerCookie } })).text();
+      const body = (html.match(/<body[^>]*>/) || [''])[0];
+      assert.ok(body.includes('data-clarity-mask="True"'), p + ' shows personal data and must be masked');
+    }
+    // The header must key masking off the login state, not a hand-maintained list.
+    const header = fs.readFileSync(path.join(__dirname, '..', 'views/partials/header.ejs'), 'utf8');
+    assert.ok(/<body id="top"<%- locals\.consumerId \?/.test(header),
+      'masking must derive from the signed-in state so new authenticated pages are covered automatically');
+  });
+
   await test('4a3. Every public page has a unique title, description and canonical', async () => {
     // The canonical tag previously defaulted to '/' on every page, which tells
     // search engines the whole site duplicates the homepage.

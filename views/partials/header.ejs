@@ -61,7 +61,15 @@
   }
   </script>
 </head>
-<body id="top">
+<%
+// Clarity masking. The dashboard mode is Balanced, which masks only numbers and
+// email addresses — not names, relationship labels, cycle answers or any other
+// free text. Every page that shows a person's own data sits behind a login, so
+// mask the whole page for signed-in visitors rather than trying to remember
+// each element. Public marketing and guide pages stay readable, which is where
+// heatmaps are actually useful.
+%>
+<body id="top"<%- locals.consumerId ? ' data-clarity-mask="True"' : '' %>>
 
 <!-- Navbar -->
 <nav class="ehw-nav">
