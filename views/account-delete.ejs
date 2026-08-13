@@ -1,0 +1,85 @@
+<%- include('partials/header', { pageTitle: 'Delete your account — e-healthwatch' }) %>
+
+<section class="ehw-sec ehw-sec--cream">
+  <div class="ehw-sec__inner" style="max-width:640px;">
+
+    <a href="/dashboard" class="auth-back">&larr; Back to dashboard</a>
+
+    <h1 style="font-size:clamp(26px,4vw,34px);color:var(--stone-dark);margin:18px 0 12px;">Delete your account</h1>
+    <p style="font-size:16px;color:var(--stone);line-height:1.75;margin-bottom:28px;">
+      This erases your personal data from e-healthwatch. <strong>It cannot be undone</strong>
+      and we cannot restore anything afterwards.
+    </p>
+
+    <% if (error) { %>
+      <p class="soon__error" role="alert"><%= error %></p>
+    <% } %>
+
+    <div class="soon__notify" style="margin-bottom:24px;">
+      <h2 style="font-size:18px;">What gets deleted</h2>
+      <ul class="soon__list" style="margin-top:16px;margin-bottom:0;">
+        <li>
+          <span class="soon__list-dot"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+          Your name, email address and phone number
+        </li>
+        <li>
+          <span class="soon__list-dot"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+          Every health profile you created, and the names on them
+        </li>
+        <li>
+          <span class="soon__list-dot"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+          All forecast results and the AMH values behind them &mdash; you will lose access to your reports
+        </li>
+        <li>
+          <span class="soon__list-dot"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+          Any contact enquiries or waitlist entries under your email address
+        </li>
+      </ul>
+    </div>
+
+    <div class="soon__notify" style="margin-bottom:28px;">
+      <h2 style="font-size:18px;">What we have to keep</h2>
+      <p class="soon__notify-sub" style="margin-bottom:0;">
+        <% if (paidOrders > 0) { %>
+          You have <strong><%= paidOrders %></strong> completed payment<%= paidOrders === 1 ? '' : 's' %>.
+          We keep the payment record &mdash; the date, the amount and the gateway
+          reference &mdash; because tax and accounting law requires it. Once your
+          account is deleted that record is no longer linked to your name, email
+          or any health data; it is just a transaction.
+        <% } else { %>
+          You have no completed payments, so there is no financial record to
+          retain. If you had, we would keep the date, amount and gateway
+          reference for tax and accounting purposes, unlinked from your identity.
+        <% } %>
+      </p>
+    </div>
+
+    <form method="post" action="/account/delete" class="soon__form">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+
+      <div class="soon__field">
+        <label for="del-password">Confirm your password</label>
+        <input id="del-password" type="password" name="password" class="ehw-contact__input" required autocomplete="current-password">
+      </div>
+
+      <div class="soon__field">
+        <label for="del-confirm">Type <strong>DELETE</strong> to confirm</label>
+        <input id="del-confirm" type="text" name="confirm" class="ehw-contact__input" placeholder="DELETE" required autocomplete="off">
+        <span class="soon__hint">This is deliberately awkward, because it cannot be reversed.</span>
+      </div>
+
+      <button type="submit" class="ehw-contact__submit" style="background:var(--rose-dark);">
+        Permanently delete my account
+      </button>
+    </form>
+
+    <p style="margin-top:22px;font-size:14px;color:var(--stone);line-height:1.7;">
+      Changed your mind? <a href="/dashboard" style="color:var(--rose-dark);font-weight:700;">Go back to your dashboard</a>.
+      If you only want to stop hearing from us, <a href="/contact.asp" style="color:var(--rose-dark);font-weight:700;">tell us instead</a> &mdash;
+      you don't have to delete everything.
+    </p>
+
+  </div>
+</section>
+
+<%- include('partials/footer') %>

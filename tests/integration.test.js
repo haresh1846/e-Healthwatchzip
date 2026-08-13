@@ -316,6 +316,67 @@ async function test(name, fn) {
     assert.equal(canons.size, paths.length, 'every page needs its own canonical URL');
   });
 
+  await test('4g. Account deletion erases personal data but retains the payment record', async () => {
+    // Sign up a throwaway account, give it a profile, and fake a paid order so
+    // the financial-retention path is actually exercised.
+    const delEmail = 'erase-me@example.com';
+    let s1 = await freshSession('/signup');
+    await post('/signup', s1.cookie, {
+      _csrf: s1.token, full_name: 'Erase Me', email: delEmail,
+      password: 'DeleteMe123', confirm_password: 'DeleteMe123', consent: 'on',
+    });
+    const delCookie = s1.cookie;
+    const row = db.prepare('SELECT id FROM consumers WHERE email = ?').get(delEmail);
+    assert.ok(row, 'test account must exist');
+    const cid = row.id;
+
+    const pTok = await tokenFor('/profile/new', delCookie);
+    await post('/profile/new', delCookie, { _csrf: pTok, display_name: 'Erase Profile', relationship_label: 'Self' });
+    const prof = db.prepare('SELECT id FROM consumer_profiles WHERE consumer_id = ?').get(cid);
+    assert.ok(prof, 'profile must exist');
+
+    db.prepare("INSERT INTO consumer_orders (consumer_id, profile_id, amount_paise, status, gateway_order_id, gateway_payment_id) VALUES (?, ?, 14900, 'paid', 'order_test123', 'pay_test123')").run(cid, prof.id);
+    db.prepare("INSERT INTO mp_results_v2 (order_id, profile_id, input_json, result_json) VALUES ((SELECT id FROM consumer_orders WHERE consumer_id = ?), ?, '{}', '{}')").run(cid, prof.id);
+    db.prepare("INSERT INTO bmd_waitlist (email) VALUES (?)").run(delEmail);
+
+    // Wrong password must not delete anything.
+    let dTok = await tokenFor('/account/delete', delCookie);
+    await post('/account/delete', delCookie, { _csrf: dTok, password: 'WrongPass1', confirm: 'DELETE' });
+    assert.ok(db.prepare('SELECT id FROM consumers WHERE email = ?').get(delEmail), 'wrong password must not erase');
+
+    // Missing the typed confirmation must not delete either.
+    dTok = await tokenFor('/account/delete', delCookie);
+    await post('/account/delete', delCookie, { _csrf: dTok, password: 'DeleteMe123', confirm: '' });
+    assert.ok(db.prepare('SELECT id FROM consumers WHERE email = ?').get(delEmail), 'missing confirmation must not erase');
+
+    // The real thing.
+    dTok = await tokenFor('/account/delete', delCookie);
+    const done = await post('/account/delete', delCookie, { _csrf: dTok, password: 'DeleteMe123', confirm: 'DELETE' });
+    assert.equal(done.status, 302);
+
+    // Personal data gone.
+    const after = db.prepare('SELECT * FROM consumers WHERE id = ?').get(cid);
+    assert.ok(after.deleted_at, 'account must be marked deleted');
+    assert.equal(after.email, 'deleted-' + cid + '@deleted.invalid');
+    assert.equal(after.full_name, null);
+    assert.ok(!db.prepare('SELECT id FROM consumers WHERE email = ?').get(delEmail), 'old address must not resolve');
+    assert.equal(db.prepare('SELECT display_name FROM consumer_profiles WHERE consumer_id = ?').get(cid).display_name, 'Deleted');
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM mp_results_v2 WHERE profile_id = ?').get(prof.id).c, 0, 'health results must be erased');
+    assert.equal(db.prepare('SELECT COUNT(*) AS c FROM bmd_waitlist WHERE email = ?').get(delEmail).c, 0, 'waitlist entry must be erased');
+
+    // Financial record retained, and still carries what accounting needs.
+    const order = db.prepare('SELECT * FROM consumer_orders WHERE consumer_id = ?').get(cid);
+    assert.ok(order, 'the paid order must be retained');
+    assert.equal(order.amount_paise, 14900);
+    assert.equal(order.gateway_payment_id, 'pay_test123');
+
+    // And the erased account cannot sign back in.
+    const s2 = await freshSession('/login');
+    const relog = await post('/login', s2.cookie, { _csrf: s2.token, email: delEmail, password: 'DeleteMe123' });
+    assert.ok(relog.status !== 302 || !String(relog.headers.get('location') || '').includes('dashboard'),
+      'a deleted account must not be able to log back in');
+  });
+
   await test('4b. Legal pages required for payments are reachable', async () => {
     for (const p of ['/terms', '/refund', '/privacy']) {
       const r = await fetch(BASE + p);

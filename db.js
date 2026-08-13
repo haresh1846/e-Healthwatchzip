@@ -213,6 +213,10 @@ async function init() {
   // Optional phone number, captured at signup, so gated forecast leads can
   // be followed up with a free wa.me click-to-chat link from the admin panel.
   await addColumn("ALTER TABLE consumers ADD COLUMN phone TEXT");
+  // Set when a user erases their account. The row itself survives with its
+  // personal fields scrubbed, because consumer_orders.consumer_id is NOT NULL
+  // and those orders are financial records that have to be retained.
+  await addColumn("ALTER TABLE consumers ADD COLUMN deleted_at DATETIME");
 
   // These two index columns are added by the migrations above, so they cannot
   // be indexed in the CREATE TABLE block — on a fresh database the column does
