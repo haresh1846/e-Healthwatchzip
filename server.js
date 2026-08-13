@@ -58,6 +58,14 @@ function getRazorpay() {
 // customer records are never inside a recording.
 const CLARITY_PROJECT_ID = process.env.CLARITY_PROJECT_ID || '';
 
+// DPDP Act, 2023 expects a named contact for data-protection complaints.
+// Same no-fallback rule as BUSINESS: blank renders nothing rather than a
+// placeholder name.
+const GRIEVANCE = {
+  name:  process.env.GRIEVANCE_OFFICER_NAME  || '',
+  email: process.env.GRIEVANCE_OFFICER_EMAIL || '',
+};
+
 const BUSINESS = {
   name:    process.env.BUSINESS_NAME    || 'e-healthwatch',
   email:   process.env.BUSINESS_EMAIL   || '',
@@ -251,6 +259,7 @@ app.use((req, res, next) => {
   res.locals.listPriceRupees = LIST_PRICE_RUPEES;
   res.locals.discountPct     = DISCOUNT_PCT;
   res.locals.business        = BUSINESS;
+  res.locals.grievance       = GRIEVANCE;
   res.locals.clarityId       = CLARITY_PROJECT_ID;
   // Canonical defaulted to '/' on every page, which told search engines the
   // whole site was one duplicate of the homepage. Derive it from the request
@@ -604,6 +613,7 @@ app.post('/login', async (req, res) => {
   }
   try {
     const consumer = await db.prepare('SELECT * FROM consumers WHERE email = ?').get(email);
+    if (consumer && consumer.deleted_at) return res.render('consumer-login', { error: 'Invalid email or password.', next: req.body.next || '' });
     if (!consumer) return res.render('consumer-login', { error: 'No account found with this email.', next: safeNext });
     const match = await bcrypt.compare(password, consumer.password_hash);
     if (!match)    return res.render('consumer-login', { error: 'Incorrect password. Please try again.', next: safeNext });
@@ -1145,6 +1155,69 @@ app.get('/already-menopausal', requireConsumer, (req, res) => {
 });
 
 // Consumer order history
+// ─── Account deletion (DPDP Act erasure right) ───────────────────────────────
+// What can and cannot go:
+//   consumer_orders are financial records that have to be retained, and both
+//   consumer_id and profile_id on them are NOT NULL. So the account row and its
+//   profile rows survive with every personal field scrubbed, which leaves the
+//   orders intact but no longer attached to an identifiable person. Everything
+//   that is purely personal or health data is deleted outright.
+app.get('/account/delete', requireConsumer, async (req, res) => {
+  const consumer = await db.prepare('SELECT email, full_name FROM consumers WHERE id = ?').get(req.session.consumerId);
+  if (!consumer) return res.redirect('/login');
+  const orders = await db.prepare(
+    "SELECT COUNT(*) AS c FROM consumer_orders WHERE consumer_id = ? AND status = 'paid'"
+  ).get(req.session.consumerId);
+  res.render('account-delete', { consumer, paidOrders: (orders || {}).c || 0, error: null });
+});
+
+app.post('/account/delete', requireConsumer, async (req, res) => {
+  const consumerId = req.session.consumerId;
+  const consumer = await db.prepare('SELECT * FROM consumers WHERE id = ?').get(consumerId);
+  if (!consumer) return res.redirect('/login');
+
+  const paid = await db.prepare(
+    "SELECT COUNT(*) AS c FROM consumer_orders WHERE consumer_id = ? AND status = 'paid'"
+  ).get(consumerId);
+  const view = (error) => res.render('account-delete', {
+    consumer, paidOrders: (paid || {}).c || 0, error,
+  });
+
+  if (rateLimited('accdel:' + req.ip)) return view(RATE_LIMIT_MESSAGE);
+
+  // Deleting an account is irreversible, so prove it is the account holder.
+  const ok = req.body.password && await bcrypt.compare(req.body.password, consumer.password_hash);
+  if (!ok) return view('That password is not correct. Your account has not been changed.');
+  if ((req.body.confirm || '').trim().toUpperCase() !== 'DELETE') {
+    return view('Type DELETE in the confirmation box to continue.');
+  }
+
+  // Tombstone derived from the row id, never from the old email, so the
+  // original address cannot be recovered from what remains.
+  const tombstoneEmail = `deleted-${consumerId}@deleted.invalid`;
+  const deadHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+
+  await db.batch([
+    // Health data and lead records — deleted outright.
+    { sql: 'DELETE FROM mp_results_v2 WHERE profile_id IN (SELECT id FROM consumer_profiles WHERE consumer_id = ?)', args: [consumerId] },
+    { sql: 'DELETE FROM forecast_gate_leads WHERE consumer_id = ?', args: [consumerId] },
+    // Anything keyed off their email address elsewhere on the site.
+    { sql: 'DELETE FROM bmd_waitlist WHERE email = ?', args: [consumer.email] },
+    { sql: 'DELETE FROM contact_messages WHERE email = ?', args: [consumer.email] },
+    // Profiles: kept because paid orders point at them, but stripped of identity.
+    { sql: "UPDATE consumer_profiles SET display_name = 'Deleted', relationship_label = NULL, date_of_birth = NULL WHERE consumer_id = ?", args: [consumerId] },
+    // The account itself: every personal field scrubbed, password made unusable.
+    { sql: `UPDATE consumers SET email = ?, full_name = NULL, phone = NULL,
+              password_hash = ?, verification_token = NULL, verification_token_expires = NULL,
+              reset_token = NULL, reset_token_expires = NULL, email_verified = 0,
+              deleted_at = CURRENT_TIMESTAMP
+            WHERE id = ?`, args: [tombstoneEmail, deadHash, consumerId] },
+  ]);
+
+  console.log('[account-delete] consumer id', consumerId, 'erased; orders retained anonymised');
+  req.session.destroy(() => res.redirect('/?deleted=1'));
+});
+
 app.get('/orders', requireConsumer, async (req, res) => {
   const orders = await db.prepare(`
     SELECT o.id, o.amount_paise, o.status, o.gateway_payment_id, o.created_at, o.paid_at,

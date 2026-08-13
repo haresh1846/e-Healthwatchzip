@@ -29,6 +29,10 @@
           <p>Clarity is used for improving the site, not for advertising, and we do not use it to identify you. You can opt out entirely by enabling <em>Do Not Track</em> or a tracker blocker in your browser; the site works exactly the same without it.</p>
 <% } %>
 
+          <h2 class="aboutpage-title">Deleting your account and data</h2>
+          <p>You can erase your account yourself at any time from your dashboard, or directly at <a href="/account/delete">/account/delete</a>. It asks for your password and takes effect immediately &mdash; we do not need to process a request.</p>
+          <p>Deleting removes your name, email, phone number, every health profile you created, all forecast results and the AMH values behind them, and any contact enquiry or waitlist entry under your email address. <strong>Payment records are retained</strong>, because tax and accounting law requires it, but they are no longer linked to your name, email or any health data &mdash; what remains is a date, an amount and a gateway reference.</p>
+
           <h2 class="aboutpage-title">What we collect</h2>
           <p>When you create an account and use the Menopause Forecast, we collect:</p>
           <ul style="line-height:1.9;">
@@ -59,6 +63,13 @@
           <p>Passwords are stored using bcrypt hashing, all payment confirmation is verified server-side with cryptographic signatures, and access to stored health data is restricted to your authenticated account.</p>
 
           <h2 class="aboutpage-title">Contact</h2>
+<% if (grievance.name || grievance.email) { %>
+          <h2 class="aboutpage-title">Grievance Officer</h2>
+          <p>Under the Digital Personal Data Protection Act, 2023, you may raise any concern about how your personal data is handled with our Grievance Officer:</p>
+          <p<% if (!grievance.name) { %> style="display:none"<% } %>><strong><%= grievance.name %></strong></p>
+          <p<% if (!grievance.email) { %> style="display:none"<% } %>>Email: <a href="mailto:<%= grievance.email %>"><%= grievance.email %></a></p>
+          <p>We aim to acknowledge a grievance within 2 business days and resolve it within 30 days. If you are not satisfied with the outcome, you may escalate to the Data Protection Board of India.</p>
+<% } %>
           <p>For any privacy question or request, reach us through the <a href="/contact.asp">contact page</a> or at hello@e-healthwatch.com.</p>
 
         </div>
