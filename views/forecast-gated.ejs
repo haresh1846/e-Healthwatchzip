@@ -1,4 +1,4 @@
-<%- include('partials/header', { pageTitle: 'Menopause Forecast — e-healthwatch', pageDesc: 'Enter your AMH value to receive your personalised menopause forecast.' }) %>
+<%- include('partials/header', { pageTitle: 'Menopause Forecast — ehealthwatch', pageDesc: 'Enter your AMH value to receive your personalised menopause forecast.' }) %>
 
 <% if (typeof razorpayOrder !== 'undefined' && razorpayOrder) { %>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
@@ -218,7 +218,7 @@
                 key:         '<%= razorpayKeyId %>',
                 amount:      <%= razorpayOrder.amount %>,
                 currency:    'INR',
-                name:        'e-healthwatch',
+                name:        'ehealthwatch',
                 description: 'Menopause Forecast for <%= profile.display_name %>',
                 order_id:    '<%= razorpayOrder.id %>',
                 prefill: {
