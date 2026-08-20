@@ -67,7 +67,7 @@ const GRIEVANCE = {
 };
 
 const BUSINESS = {
-  name:    process.env.BUSINESS_NAME    || 'e-healthwatch',
+  name:    process.env.BUSINESS_NAME    || 'ehealthwatch',
   email:   process.env.BUSINESS_EMAIL   || '',
   phone:   process.env.BUSINESS_PHONE   || '',
   address: process.env.BUSINESS_ADDRESS || '',
@@ -372,12 +372,12 @@ async function sendContactEmail({ fname, lname, email, phone, comment }) {
     const ownerEmail = process.env.GMAIL_USER;
     const senderName = [fname, lname].filter(Boolean).join(' ') || 'A visitor';
     await transporter.sendMail({
-      from:     `"e-healthwatch Contact Form" <${ownerEmail}>`,
+      from:     `"${BUSINESS.name} Contact Form" <${ownerEmail}>`,
       to:       ownerEmail,
       replyTo:  email || ownerEmail,
-      subject:  `New enquiry from ${senderName} — e-healthwatch`,
+      subject:  `New enquiry from ${senderName} — ${BUSINESS.name}`,
       text: [
-        `You have received a new contact form submission on e-healthwatch.`,
+        `You have received a new contact form submission on ${BUSINESS.name}.`,
         ``,
         `Name:    ${senderName}`,
         `Email:   ${email || '(not provided)'}`,
@@ -428,13 +428,13 @@ async function sendVerificationEmail(req, consumer) {
   }
   try {
     await transporter.sendMail({
-      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      from:    `"${BUSINESS.name}" <${process.env.GMAIL_USER}>`,
       to:      consumer.email,
-      subject: 'Verify your email — e-healthwatch',
+      subject: `Verify your email — ${BUSINESS.name}`,
       text: [
         `Hello${consumer.full_name ? ' ' + consumer.full_name : ''},`,
         ``,
-        `Please confirm your email address for your e-healthwatch account by opening this link:`,
+        `Please confirm your email address for your ${BUSINESS.name} account by opening this link:`,
         ``,
         link,
         ``,
@@ -699,9 +699,9 @@ async function sendReceiptEmail(orderId) {
     const fieldLabelWidth = Math.max(...fields.map(([label]) => label.length)) + 1;
 
     await transporter.sendMail({
-      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      from:    `"${BUSINESS.name}" <${process.env.GMAIL_USER}>`,
       to:      o.email,
-      subject: `Payment receipt — ${orderNumber} — e-healthwatch`,
+      subject: `Payment receipt — ${orderNumber} — ${BUSINESS.name}`,
       text: [
         `Hello${o.full_name ? ' ' + o.full_name : ''},`,
         ``,
@@ -711,7 +711,7 @@ async function sendReceiptEmail(orderId) {
         ``,
         `Your result is stored permanently on your profile — sign in at any time to view it or download the report.`,
         ``,
-        `— e-healthwatch`,
+        `— ${BUSINESS.name}`,
       ].join('\n'),
       html: `
         <div style="font-family: Arial, Helvetica, sans-serif; color: #1E293B; max-width: 480px; margin: 0 auto;">
@@ -725,7 +725,7 @@ async function sendReceiptEmail(orderId) {
             </tr>`).join('')}
           </table>
           <p style="font-size: 13px; color: #475569; margin: 0 0 20px;">Your result is stored permanently on your profile — sign in at any time to view it or download the report.</p>
-          <p style="font-size: 14px; color: #E11D48; font-weight: bold; margin: 0;">— e-healthwatch</p>
+          <p style="font-size: 14px; color: #E11D48; font-weight: bold; margin: 0;">— ${BUSINESS.name}</p>
         </div>
       `,
       attachments,
@@ -760,13 +760,13 @@ async function sendPasswordResetEmail(req, consumer) {
   }
   try {
     await transporter.sendMail({
-      from:    `"e-healthwatch" <${process.env.GMAIL_USER}>`,
+      from:    `"${BUSINESS.name}" <${process.env.GMAIL_USER}>`,
       to:      consumer.email,
-      subject: 'Reset your password — e-healthwatch',
+      subject: `Reset your password — ${BUSINESS.name}`,
       text: [
         `Hello${consumer.full_name ? ' ' + consumer.full_name : ''},`,
         ``,
-        `Someone requested a password reset for your e-healthwatch account.`,
+        `Someone requested a password reset for your ${BUSINESS.name} account.`,
         `To choose a new password, open this link (valid for 1 hour):`,
         ``,
         link,
@@ -1606,7 +1606,7 @@ app.get('/admin/forecast-leads', requireAdmin, async (req, res) => {
     const digits = String(l.consumer_phone).replace(/\D/g, '');
     if (!digits) return { ...l, waLink: null };
     const cycleLabel = l.cycle_regularity === 'R' ? 'Regular' : 'Irregular';
-    const message = `Hi ${l.consumer_name || 'there'}, this is e-healthwatch following up on your Menopause Forecast check for ${l.profile_name || 'your profile'}. Based on the details you shared (age ${l.age}, AMH ${l.amh} ng/mL, ${cycleLabel} cycle), our calculator wasn't able to give a forward-looking forecast right now — this isn't a diagnosis, just a signal from the numbers. We'd recommend speaking with a gynaecologist for a full assessment. Let us know if you'd like help finding one.`;
+    const message = `Hi ${l.consumer_name || 'there'}, this is ${BUSINESS.name} following up on your Menopause Forecast check for ${l.profile_name || 'your profile'}. Based on the details you shared (age ${l.age}, AMH ${l.amh} ng/mL, ${cycleLabel} cycle), our calculator wasn't able to give a forward-looking forecast right now — this isn't a diagnosis, just a signal from the numbers. We'd recommend speaking with a gynaecologist for a full assessment. Let us know if you'd like help finding one.`;
     return { ...l, waLink: `https://wa.me/${digits}?text=${encodeURIComponent(message)}` };
   });
 
@@ -1656,7 +1656,7 @@ app.get('/admin/bmd-waitlist', requireAdmin, async (req, res) => {
   const withWa = rows.map(r => {
     const digits = r.phone ? String(r.phone).replace(/\D/g, '') : '';
     if (!digits) return { ...r, waLink: null };
-    const message = `Hi, this is e-healthwatch. You asked to be told when our BMD Calculator goes live — it's ready now. You can try it free, no account needed.`;
+    const message = `Hi, this is ${BUSINESS.name}. You asked to be told when our BMD Calculator goes live — it's ready now. You can try it free, no account needed.`;
     return { ...r, waLink: `https://wa.me/${digits}?text=${encodeURIComponent(message)}` };
   });
 
@@ -1782,7 +1782,7 @@ app.use((err, req, res, next) => {
 // imported by api/index.js and invoked per-request instead.
 if (require.main === module) {
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`e-healthwatch running on port ${PORT}`);
+    console.log(`${BUSINESS.name} running on port ${PORT}`);
   });
 }
 
