@@ -377,6 +377,18 @@ async function test(name, fn) {
       'a deleted account must not be able to log back in');
   });
 
+  await test('4h. /healthz reports readiness for the platform load balancer', async () => {
+    const r = await fetch(BASE + '/healthz');
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).status, 'ok');
+
+    // It must sit before the db.ready gate, or a machine still migrating hangs
+    // the check instead of reporting that it is not ready yet.
+    const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
+    assert.ok(src.indexOf("app.get('/healthz'") < src.indexOf('db.ready.then(() => next()'),
+      '/healthz must be registered before the db.ready middleware');
+  });
+
   await test('4b. Legal pages required for payments are reachable', async () => {
     for (const p of ['/terms', '/refund', '/privacy']) {
       const r = await fetch(BASE + p);

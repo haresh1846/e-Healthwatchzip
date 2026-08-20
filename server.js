@@ -130,6 +130,17 @@ app.set('views', path.join(__dirname, 'views'));
 // Static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Health check for the platform's load balancer. Deliberately registered
+// *before* the db.ready gate below: if it sat after, a machine still running
+// migrations would hang the check instead of reporting that it isn't ready.
+let dbReady = false;
+db.ready.then(() => { dbReady = true; }, () => { dbReady = false; });
+
+app.get('/healthz', (req, res) => {
+  if (!dbReady) return res.status(503).json({ status: 'starting' });
+  res.json({ status: 'ok' });
+});
+
 // No request is served until the schema/seed init in db.js has completed —
 // matters on serverless cold starts where init races the first request.
 app.use((req, res, next) => {
@@ -1781,9 +1792,28 @@ app.use((err, req, res, next) => {
 // Listen only when run directly (node server.js). On Vercel the app is
 // imported by api/index.js and invoked per-request instead.
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`${BUSINESS.name} running on port ${PORT}`);
   });
+
+  // Fly sends SIGTERM before replacing a machine on deploy. Stop accepting new
+  // connections, let in-flight requests finish — a payment verification is not
+  // something to cut mid-flight — then exit. The timeout is a backstop so a
+  // stuck connection can't block the deploy forever.
+  const shutdown = (signal) => {
+    console.log(`[shutdown] ${signal} received, finishing in-flight requests`);
+    clearInterval(rateLimitSweep);
+    server.close(() => {
+      console.log('[shutdown] closed cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => {
+      console.warn('[shutdown] timed out waiting for connections, exiting anyway');
+      process.exit(0);
+    }, 10000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT',  () => shutdown('SIGINT'));
 }
 
 module.exports = app;

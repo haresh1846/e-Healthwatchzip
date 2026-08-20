@@ -1,0 +1,21 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Local SQLite database — production uses Turso. Shipping this into the image
+# would both bloat it and risk the app silently falling back to stale local data.
+*.db
+ehealthwatch.db
+
+# Not needed at runtime
+tests
+artifacts
+attached_assets
+.agents
+*.md
+!replit.md
+vercel.json

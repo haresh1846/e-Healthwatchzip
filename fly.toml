@@ -1,0 +1,44 @@
+# Fly.io — production. Vercel remains the dev/test deployment; the two are
+# configured entirely through environment variables, so the same code serves
+# both. See DEPLOY.md for which variables must differ between them.
+
+app = "ehealthwatch"
+primary_region = "bom"   # Mumbai — the audience and the billing are Indian
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # A live payment site should not make a customer wait on a cold start, so
+  # keep one machine warm rather than scaling to zero.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  # The rate limiter is an in-memory Map, so its counters are per-machine.
+  # Running a single machine keeps the login and payment throttles accurate.
+  # Before scaling past one, move the limiter into the database.
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+  # /healthz is registered before the db.ready gate, so a machine still running
+  # migrations reports 503 instead of hanging and being killed as unhealthy.
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
