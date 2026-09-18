@@ -1,0 +1,37 @@
+<%
+/*
+  Responsive image.
+
+  Every file in public/images exists as AVIF, WebP and JPEG at 450w, 650w and
+  900w. The 650w tier exists because the display boxes are small: a 240px hero
+  on a DPR-2 phone needs 480px, which without it rounds all the way up to 900.
+  The 900w JPEG deliberately keeps the bare <name>.jpg filename: og:image in
+  partials/header.ejs points at /images/warm-hero.jpg, and several social
+  crawlers (WhatsApp especially) will not render an AVIF or WebP share image.
+
+  Locals:
+    imgName   required  basename with no extension, e.g. 'warm-hero'
+    imgAlt    required  alt text
+    imgClass  required  class applied to the <img>, not the <picture>
+    imgSizes  required  sizes attribute — must match the CSS display widths,
+                        or the browser picks the wrong candidate
+    imgEager  optional  true for above-the-fold images; default is lazy
+    imgAttrs  optional  raw extra attributes
+
+  The <picture> wrapper is given `display: contents` in custom.css so it does
+  not become the flex item or break the percentage heights its parents set.
+*/
+const n = locals.imgName;
+%>
+<picture>
+  <source type="image/avif" sizes="<%= locals.imgSizes %>" srcset="/images/<%= n %>-450.avif 450w, /images/<%= n %>-650.avif 650w, /images/<%= n %>-900.avif 900w">
+  <source type="image/webp" sizes="<%= locals.imgSizes %>" srcset="/images/<%= n %>-450.webp 450w, /images/<%= n %>-650.webp 650w, /images/<%= n %>-900.webp 900w">
+  <img src="/images/<%= n %>.jpg"
+       srcset="/images/<%= n %>-450.jpg 450w, /images/<%= n %>-650.jpg 650w, /images/<%= n %>.jpg 900w"
+       sizes="<%= locals.imgSizes %>"
+       alt="<%= locals.imgAlt %>"
+       class="<%= locals.imgClass %>"
+       width="900" height="900"
+       decoding="async"
+       <%- locals.imgEager ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"' %><%- locals.imgAttrs ? '\n       ' + locals.imgAttrs : '' %>>
+</picture>

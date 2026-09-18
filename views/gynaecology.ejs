@@ -18,7 +18,12 @@
     <div class="content-layout">
       <article class="content-article">
         <div class="page-illus-wrap">
-          <img src="/images/gynaecology-banner.jpg" alt="Gynaecology wellness illustration" class="page-illus">
+          <%- include('partials/responsive-img', {
+            imgName: 'gynaecology-banner',
+            imgAlt: 'Gynaecology wellness illustration',
+            imgClass: 'page-illus',
+            imgSizes: '(max-width: 768px) calc(100vw - 40px), 360px'
+          }) %>
         </div>
 
         <h3>A cycle governed by a biological clock</h3>

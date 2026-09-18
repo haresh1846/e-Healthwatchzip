@@ -49,8 +49,16 @@
     </div>
 
     <div class="fc-gate-hero__img-wrap">
-      <img src="/images/forecast-illustration.jpg" alt="Menopause forecasting illustration" class="fc-gate-hero__img"
-        onerror="this.style.display='none'">
+      <%# Lazy on purpose: custom.css:1598 hides this wrapper below 768px, and a
+          lazy image inside a display:none container is never fetched at all, so
+          phones download nothing. On desktop it is in the viewport and loads at once. %>
+      <%- include('partials/responsive-img', {
+        imgName: 'forecast-illustration',
+        imgAlt: 'Menopause forecasting illustration',
+        imgClass: 'fc-gate-hero__img',
+        imgSizes: '320px',
+        imgAttrs: 'onerror="this.style.display=&#39;none&#39;"'
+      }) %>
     </div>
 
   </div>

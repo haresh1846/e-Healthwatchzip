@@ -18,7 +18,12 @@
     <div class="content-layout">
       <article class="content-article">
         <div class="page-illus-wrap">
-          <img src="/images/health-banner.jpg" alt="Health wellness illustration" class="page-illus">
+          <%- include('partials/responsive-img', {
+            imgName: 'health-banner',
+            imgAlt: 'Health wellness illustration',
+            imgClass: 'page-illus',
+            imgSizes: '(max-width: 768px) calc(100vw - 40px), 360px'
+          }) %>
         </div>
 
         <h3>What is health?</h3>

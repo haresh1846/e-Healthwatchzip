@@ -18,7 +18,12 @@
     <div class="content-layout">
       <article class="content-article">
         <div class="page-illus-wrap">
-          <img src="/images/pregnancy-banner.jpg" alt="Pregnancy wellness illustration" class="page-illus">
+          <%- include('partials/responsive-img', {
+            imgName: 'pregnancy-banner',
+            imgAlt: 'Pregnancy wellness illustration',
+            imgClass: 'page-illus',
+            imgSizes: '(max-width: 768px) calc(100vw - 40px), 360px'
+          }) %>
         </div>
 
         <h3>A major event, shaped by more than biology</h3>
