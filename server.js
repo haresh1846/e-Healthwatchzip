@@ -127,7 +127,16 @@ app.use((req, res, next) => {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// Static files
+// Static files. Images get their own max-age: the artwork changes far less
+// often than the code, so making a repeat visitor re-validate every banner on
+// every page is wasted round trips. Deliberately NOT `immutable`, and only a
+// week: these filenames are not content-hashed, and /images/warm-hero.jpg is
+// the og:image — if the artwork is ever replaced, `immutable` would strand
+// browsers and social crawlers on the old file with no way to refetch it.
+// Content-hash the filenames and this can safely go to a year.
+app.use('/images', express.static(path.join(__dirname, 'public/images'), {
+  maxAge: '7d'
+}));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check for the platform's load balancer. Deliberately registered

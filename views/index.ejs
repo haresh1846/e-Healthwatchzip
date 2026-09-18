@@ -42,7 +42,13 @@
 
     <!-- Image + Deal -->
     <div class="ehw-hero__img-wrap">
-      <img src="/images/warm-hero.jpg" alt="Warm wellness illustration for women's health" class="ehw-hero__img">
+      <%- include('partials/responsive-img', {
+        imgName: 'warm-hero',
+        imgAlt: "Warm wellness illustration for women's health",
+        imgClass: 'ehw-hero__img',
+        imgSizes: '(max-width: 480px) 240px, (max-width: 768px) 300px, 500px',
+        imgEager: true
+      }) %>
       <div class="ehw-hero__deal">
         <div class="ehw-hero__deal-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L9.27 9l-6.27.73 4.5 4.27-1.09 6.27L12 17l5.59 3.27-1.09-6.27 4.5-4.27-6.27-.73z"/></svg>

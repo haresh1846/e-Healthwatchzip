@@ -883,6 +883,14 @@ textarea.ehw-contact__input { height:120px;resize:none; }
   .fc-converter-row { flex-wrap: wrap; }
 }
 
+/* The responsive-img partial wraps every photo in <picture>. Without this the
+   <picture> becomes the flex item instead of the <img>, and the percentage
+   heights below resolve against a box that has none. `display: contents`
+   removes it from the box tree so the layout is exactly as it was. */
+.ehw-hero__img-wrap > picture,
+.page-illus-wrap > picture,
+.fc-gate-hero__img-wrap > picture { display: contents; }
+
 /* ── Page illustrations (inner pages) ──────────────────────────── */
 .page-illus-wrap {
   float:right; margin:0 0 28px 36px; max-width:360px; width:100%;
